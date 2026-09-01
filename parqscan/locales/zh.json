@@ -1,0 +1,207 @@
+{
+  "app": {
+    "subtitle": "专业 Parquet 检查器"
+  },
+  "menu": {
+    "file": "文件",
+    "export": "导出",
+    "view": "视图",
+    "language": "语言",
+    "help": "帮助"
+  },
+  "file": {
+    "open": "打开 Parquet",
+    "recent": "最近文件",
+    "close": "关闭当前文件",
+    "exit": "退出",
+    "no_recent": "暂无最近文件",
+    "open_failed": "无法打开文件：{error}"
+  },
+  "sidebar": {
+    "open_files": "已打开文件",
+    "open_files_count": "已打开文件 · {count}",
+    "sort_opened": "打开顺序",
+    "sort_name_asc": "名称升序",
+    "sort_name_desc": "名称降序",
+    "sort_size_desc": "大小降序"
+  },
+  "welcome": {
+    "title": "开始检查 Parquet 数据",
+    "description": "打开文件、拖入窗口，或从最近文件继续。数据页采用明确分页，每次只读取一页。"
+  },
+  "tabs": {
+    "metadata": "元数据",
+    "data": "数据预览",
+    "hex": "二进制检查"
+  },
+  "common": {
+    "previous": "上一个",
+    "next": "下一个",
+    "clear": "清除",
+    "cancel": "取消",
+    "close": "关闭",
+    "export": "导出",
+    "error": "错误",
+    "information": "提示",
+    "completed": "已完成",
+    "search": "搜索",
+    "confirm": "确定"
+  },
+  "metadata": {
+    "eyebrow": "文件分析",
+    "path": "文件路径",
+    "rows": "总行数",
+    "columns": "字段数",
+    "file_size": "文件大小",
+    "binary_size": "二进制压缩大小",
+    "compression": "压缩算法",
+    "row_groups": "行组数量",
+    "schema": "Schema 与列存储",
+    "row_group_details": "行组详情",
+    "name": "名称",
+    "logical_type": "逻辑类型",
+    "physical_type": "物理类型",
+    "nullable": "可空",
+    "compressed_size": "压缩大小",
+    "storage_ratio": "文件占比",
+    "binary": "含二进制",
+    "row_group": "行组",
+    "total_size": "总大小",
+    "minimum": "最小值",
+    "maximum": "最大值",
+    "null_count": "空值数",
+    "copy_path": "复制完整路径"
+  },
+  "data": {
+    "eyebrow": "分页数据浏览",
+    "title": "数据预览",
+    "search_placeholder": "搜索整个文件（Ctrl+F）",
+    "filter_value": "筛选当前页的值",
+    "contains": "包含",
+    "equals": "等于",
+    "apply_filter": "应用筛选",
+    "clear_filter": "清除筛选",
+    "extract_images": "批量提取图片",
+    "match_count": "匹配 {count}",
+    "items_per_page": "每页",
+    "page_summary": "第 {page} / {total} 页 · 共 {rows} 行",
+    "first_page": "第一页",
+    "previous_page": "上一页",
+    "next_page": "下一页",
+    "last_page": "最后一页",
+    "loading_page": "正在加载第 {page} / {total} 页",
+    "loading_preparing": "正在定位行组并准备数据…",
+    "loading_progress": "读取进度 {percent}%",
+    "focus_search": "搜索整个文件",
+    "page_input_hint": "输入页码并按回车跳转",
+    "page_range_summary": "显示第 {start}–{end} 行 · 共 {rows} 行",
+    "page_total": "共 {total} 页",
+    "searching": "正在搜索整个文件… {percent}%",
+    "match_position": "第 {current} / {count} 个匹配",
+    "clear_file_sort": "恢复文件顺序",
+    "reset_column_order": "重置列顺序",
+    "search_scope_file": "文件级搜索",
+    "search_scope_page": "当前页搜索",
+    "page_search_placeholder": "搜索当前页可见内容",
+    "page_search_waiting": "等待当前页加载…",
+    "file_match_count": "全文件匹配 {count}",
+    "page_match_count": "本页匹配 {count}",
+    "file_match_position": "全文件 {current} / {count}",
+    "page_match_position": "本页 {current} / {count}",
+    "match_hidden_by_filter": "匹配项被当前页筛选隐藏，请清除筛选后再定位",
+    "file_matches_hidden_by_filter": "全文件匹配 {count} · 当前筛选下未显示匹配"
+  },
+  "detail": {
+    "window_title": "第 {row} 行详情",
+    "title": "记录详情 · 第 {row} 行",
+    "fields": "字段",
+    "copy_value": "复制当前值",
+    "value_tab": "字段完整内容",
+    "row_json_tab": "整行 JSON",
+    "row_chip": "源行 {row}",
+    "source_row": "源行 {row}",
+    "characters": "{count} 字符",
+    "wrap_text": "自动换行",
+    "zoom_out": "缩小",
+    "zoom_in": "放大",
+    "reset_view": "恢复视图",
+    "search_placeholder": "搜索当前记录（Ctrl+F）",
+    "search_previous": "上一个匹配",
+    "search_next": "下一个匹配",
+    "search_close": "关闭搜索",
+    "search_no_match": "未找到匹配",
+    "search_position": "第 {current} / {count} 个匹配",
+    "multi_select_hint": "按 Ctrl/Command 或 Shift 多选字段。新选中的格叠在画布左上角 (0,0) 并置顶，已有格的位置和大小保持不变；每格都可拖动、缩放，文本格可自动换行。在详情文本中选中字符串，会同步高亮当前显示内容中的所有相同字符串。"
+  },
+  "context": {
+    "open_detail": "打开完整详情",
+    "copy_cell": "复制显示值",
+    "copy_row": "复制整行 JSON",
+    "copy_page_column": "复制当前页整列",
+    "copy_base64": "复制二进制 Base64",
+    "export_binary": "导出原始文件…",
+    "view_raw_bytes": "查看原始字节…"
+  },
+  "hex": {
+    "window_title": "Hex + ASCII 预览",
+    "search_placeholder": "搜索 Hex 或 ASCII 文本",
+    "empty_title": "尚未载入原始字节",
+    "empty_hint": "在记录详情中选择二进制字段，或在数据表右键二进制单元格并选择“查看原始字节”。",
+    "cell_label": "{column} · 第 {row} 行",
+    "purpose": "用于检查二进制字段的原始字节，可按 Hex、文本或偏移地址定位内容。",
+    "mode_auto": "自动识别",
+    "mode_hex": "Hex 字节",
+    "mode_text": "文本",
+    "mode_offset": "偏移地址",
+    "search_idle": "输入内容后点击“搜索”",
+    "match_summary": "{current}/{total} · {offset}",
+    "no_match": "未找到匹配",
+    "invalid_query": "搜索格式无效",
+    "purpose_compact": "高级工具：直接搜索当前字段的原始 bytes；图片请在记录详情中查看。",
+    "search_ready": "点击“搜索”开始定位"
+  },
+  "images": {
+    "preview_title": "图片预览",
+    "none_detected": "当前文件没有可提取的二进制图片列。",
+    "select_column": "选择图片列",
+    "column": "列",
+    "target_directory": "选择输出目录",
+    "completed": "已导出 {count} 张图片。"
+  },
+  "export": {
+    "title": "导出数据",
+    "csv": "导出 CSV",
+    "json": "导出 JSON",
+    "excel": "导出 Excel",
+    "markdown": "导出 Markdown",
+    "sql": "导出 SQL",
+    "fragment": "导出 Parquet 碎片",
+    "completed": "文件已保存到：{path}"
+  },
+  "range": {
+    "title": "导出 Parquet 行列范围",
+    "start_row": "起始行",
+    "end_row": "结束行",
+    "columns": "选择字段"
+  },
+  "progress": {
+    "exporting": "正在导出数据…",
+    "extracting_images": "正在提取图片…",
+    "sorting_file": "正在对整个文件排序…"
+  },
+  "theme": {
+    "system": "跟随系统",
+    "light": "浅色",
+    "dark": "深色"
+  },
+  "status": {
+    "no_selection": "未选择单元格",
+    "coordinate": "第 {row} 行 · 第 {column} 列",
+    "page_rows": "当前页 {loaded} 行 · 文件共 {total} 行",
+    "memory": "内存 {memory}"
+  },
+  "about": {
+    "title": "关于 ParqScan",
+    "text": "ParqScan {release} 是面向 Parquet、嵌入图片和二进制附件的桌面检查与转换工具。本软件按 Apache License 2.0 授权。"
+  }
+}

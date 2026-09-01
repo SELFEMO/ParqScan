@@ -1,0 +1,207 @@
+{
+  "app": {
+    "subtitle": "Professional Parquet inspector"
+  },
+  "menu": {
+    "file": "File",
+    "export": "Export",
+    "view": "View",
+    "language": "Language",
+    "help": "Help"
+  },
+  "file": {
+    "open": "Open Parquet",
+    "recent": "Recent files",
+    "close": "Close current file",
+    "exit": "Exit",
+    "no_recent": "No recent files",
+    "open_failed": "Could not open the file: {error}"
+  },
+  "sidebar": {
+    "open_files": "OPEN FILES",
+    "open_files_count": "OPEN FILES · {count}",
+    "sort_opened": "Opened",
+    "sort_name_asc": "Name A–Z",
+    "sort_name_desc": "Name Z–A",
+    "sort_size_desc": "Largest"
+  },
+  "welcome": {
+    "title": "Start inspecting Parquet data",
+    "description": "Open a file, drop it into this window, or continue from recent files. The data view uses explicit pagination and reads one page at a time."
+  },
+  "tabs": {
+    "metadata": "Metadata",
+    "data": "Data preview",
+    "hex": "Binary inspector"
+  },
+  "common": {
+    "previous": "Previous",
+    "next": "Next",
+    "clear": "Clear",
+    "cancel": "Cancel",
+    "close": "Close",
+    "export": "Export",
+    "error": "Error",
+    "information": "Information",
+    "completed": "Completed",
+    "search": "Search",
+    "confirm": "OK"
+  },
+  "metadata": {
+    "eyebrow": "FILE ANALYSIS",
+    "path": "Path",
+    "rows": "Total rows",
+    "columns": "Fields",
+    "file_size": "File size",
+    "binary_size": "Compressed binary size",
+    "compression": "Compression",
+    "row_groups": "Row groups",
+    "schema": "Schema and column storage",
+    "row_group_details": "Row-group details",
+    "name": "Name",
+    "logical_type": "Logical type",
+    "physical_type": "Physical type",
+    "nullable": "Nullable",
+    "compressed_size": "Compressed size",
+    "storage_ratio": "File share",
+    "binary": "Contains binary",
+    "row_group": "Row group",
+    "total_size": "Total size",
+    "minimum": "Minimum",
+    "maximum": "Maximum",
+    "null_count": "Null count",
+    "copy_path": "Copy full path"
+  },
+  "data": {
+    "eyebrow": "PAGED DATA BROWSER",
+    "title": "Data preview",
+    "search_placeholder": "Search the entire file (Ctrl+F)",
+    "filter_value": "Filter values on the current page",
+    "contains": "Contains",
+    "equals": "Equals",
+    "apply_filter": "Apply filter",
+    "clear_filter": "Clear filter",
+    "extract_images": "Extract images",
+    "match_count": "{count} matches",
+    "items_per_page": "Rows per page",
+    "page_summary": "Page {page} / {total} · {rows} total rows",
+    "first_page": "First page",
+    "previous_page": "Previous page",
+    "next_page": "Next page",
+    "last_page": "Last page",
+    "loading_page": "Loading page {page} / {total}",
+    "loading_preparing": "Locating row groups and preparing data…",
+    "loading_progress": "Read progress {percent}%",
+    "focus_search": "Search entire file",
+    "page_input_hint": "Enter a page number and press Enter",
+    "page_range_summary": "Rows {start}–{end} · {rows} total",
+    "page_total": "{total} pages",
+    "searching": "Searching file… {percent}%",
+    "match_position": "{current} / {count} matches",
+    "clear_file_sort": "Restore file order",
+    "reset_column_order": "Reset column order",
+    "search_scope_file": "File search",
+    "search_scope_page": "Current page",
+    "page_search_placeholder": "Search visible content on this page",
+    "page_search_waiting": "Waiting for the current page…",
+    "file_match_count": "{count} matches in file",
+    "page_match_count": "{count} matches on page",
+    "file_match_position": "File {current} / {count}",
+    "page_match_position": "Page {current} / {count}",
+    "match_hidden_by_filter": "The match is hidden by the current-page filter. Clear the filter to locate it.",
+    "file_matches_hidden_by_filter": "{count} matches in file · none visible under the current filter"
+  },
+  "detail": {
+    "window_title": "Row {row} details",
+    "title": "Record details · Row {row}",
+    "fields": "FIELDS",
+    "copy_value": "Copy current value",
+    "value_tab": "Complete field value",
+    "row_json_tab": "Full row JSON",
+    "row_chip": "Source row {row}",
+    "source_row": "Source row {row}",
+    "characters": "{count} characters",
+    "wrap_text": "Wrap text",
+    "zoom_out": "Zoom out",
+    "zoom_in": "Zoom in",
+    "reset_view": "Reset view",
+    "search_placeholder": "Search this record (Ctrl+F)",
+    "search_previous": "Previous match",
+    "search_next": "Next match",
+    "search_close": "Close search",
+    "search_no_match": "No matches",
+    "search_position": "{current} / {count} matches",
+    "multi_select_hint": "Ctrl/Command or Shift-click fields to compare them. Newly selected tiles stack at the canvas origin (0,0) on top; existing tiles keep their position and size. Each tile can be dragged, resized, and wrap text. Selecting text highlights every identical string in the currently displayed details."
+  },
+  "context": {
+    "open_detail": "Open full details",
+    "copy_cell": "Copy displayed value",
+    "copy_row": "Copy row as JSON",
+    "copy_page_column": "Copy current-page column",
+    "copy_base64": "Copy binary as Base64",
+    "export_binary": "Export original file…",
+    "view_raw_bytes": "View raw bytes…"
+  },
+  "hex": {
+    "window_title": "Hex + ASCII preview",
+    "search_placeholder": "Search Hex or ASCII text",
+    "empty_title": "No raw bytes loaded",
+    "empty_hint": "Choose a binary field in record details, or right-click a binary table cell and select “View raw bytes”.",
+    "cell_label": "{column} · Row {row}",
+    "purpose": "Inspect a binary field’s raw bytes and locate content by Hex, text, or byte offset.",
+    "mode_auto": "Auto",
+    "mode_hex": "Hex bytes",
+    "mode_text": "Text",
+    "mode_offset": "Offset",
+    "search_idle": "Enter a value, then click Search",
+    "match_summary": "{current}/{total} · {offset}",
+    "no_match": "No match",
+    "invalid_query": "Invalid search format",
+    "purpose_compact": "Advanced tool: search the current field’s raw bytes directly; use record details for image viewing.",
+    "search_ready": "Click Search to locate"
+  },
+  "images": {
+    "preview_title": "Image preview",
+    "none_detected": "No extractable binary image column was found.",
+    "select_column": "Select image column",
+    "column": "Column",
+    "target_directory": "Choose output directory",
+    "completed": "Exported {count} images."
+  },
+  "export": {
+    "title": "Export data",
+    "csv": "Export CSV",
+    "json": "Export JSON",
+    "excel": "Export Excel",
+    "markdown": "Export Markdown",
+    "sql": "Export SQL",
+    "fragment": "Export Parquet fragment",
+    "completed": "Saved to: {path}"
+  },
+  "range": {
+    "title": "Export Parquet row and column range",
+    "start_row": "Start row",
+    "end_row": "End row",
+    "columns": "Select fields"
+  },
+  "progress": {
+    "exporting": "Exporting data…",
+    "extracting_images": "Extracting images…",
+    "sorting_file": "Sorting the entire file…"
+  },
+  "theme": {
+    "system": "Follow system",
+    "light": "Light",
+    "dark": "Dark"
+  },
+  "status": {
+    "no_selection": "No cell selected",
+    "coordinate": "Row {row} · Column {column}",
+    "page_rows": "{loaded} rows on page · {total} total rows",
+    "memory": "Memory {memory}"
+  },
+  "about": {
+    "title": "About ParqScan",
+    "text": "ParqScan {release} is a desktop inspector and converter for Parquet files, embedded images, and binary attachments. Licensed under the Apache License, Version 2.0."
+  }
+}

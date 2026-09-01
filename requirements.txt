@@ -1,0 +1,4 @@
+PySide6
+pyarrow
+openpyxl
+psutil
