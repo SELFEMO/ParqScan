@@ -2,6 +2,20 @@
 
 按日期记录重要修改及原因。同一天内相关改动已合并，更早条目保持原顺序。
 
+## 2026-09-14 — 修复 Windows 打包后任务栏图标丢失
+
+### 修改内容
+
+- 将 `SetCurrentProcessExplicitAppUserModelID` 抽到 `parqscan/utils/windows_shell.py`，并在 `main.py` 于任何 `PySide6` 导入前调用。
+- 新增 `parqscan/utils/app_icon.py`：Windows 运行时按 `ParqScan.ico` → PNG → SVG 加载 `QIcon`；其他平台保持 SVG → PNG。
+- `ParqScan.spec` 显式收集 PySide6 `iconengines` 与 `imageformats` 插件（`qsvgicon`、`qico`、`qpng` 等）。
+- 无 parent 的 `RecordDetailDialog` 显式 `setWindowIcon(QApplication.windowIcon())`。
+- 冒烟测试在关闭窗口前断言 `application.windowIcon().pixmap(64, 64)` 非空；新增 `tests/test_app_icon.py`。
+
+### 设计原因
+
+开发模式下 SVG/PNG 图标引擎来自本机 PySide6 环境，任务栏正常；冻结产物若未完整带上 `qsvgicon` 等插件，仅靠 SVG→PNG 回退仍可能得到空图标。Windows 对 `.ico` 有原生支持，且任务栏身份必须在导入 Qt 前建立，否则可能继续显示 Python 默认图标。EXE 内嵌 `.ico` 只影响资源管理器中的文件图标，运行中任务栏仍依赖 `QIcon` 与 AppUserModelID。
+
 ## 2026-09-01 — 记录详情画布、悬停预览与字段格描边
 
 ### 修改内容

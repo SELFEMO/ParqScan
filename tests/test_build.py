@@ -49,6 +49,9 @@ class BuildConfigurationTests(unittest.TestCase):
         self.assertIn('"PySide6.QtSvg"', source)
         self.assertIn('"ParqScan.ico"', source)
         self.assertIn("icon=WINDOWS_ICON", source)
+        self.assertIn('collect_plugins("iconengines")', source)
+        self.assertIn('collect_plugins("imageformats")', source)
+        self.assertIn("PYARROW_BINARIES + QT_PLUGIN_BINARIES", source)
 
     def test_conda_pyarrow_dlls_are_collected_without_collecting_tests(self) -> None:
         source = (ROOT / "ParqScan.spec").read_text(encoding="utf-8")

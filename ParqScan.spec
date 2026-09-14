@@ -5,6 +5,7 @@ import sys
 
 from PyInstaller.compat import is_pure_conda
 from PyInstaller.utils.hooks import collect_dynamic_libs
+from PyInstaller.utils.hooks.qt import pyside6_library_info
 
 
 ROOT = Path(SPECPATH).resolve()
@@ -36,6 +37,13 @@ HIDDEN_IMPORTS = [
     "PySide6.QtSvg",
 ]
 
+# 显式收集图标引擎与图片格式插件，避免冻结产物在缺少 qsvgicon/qpng/qico 时无法渲染 SVG/PNG 图标。
+# Collect icon engine and image format plugins explicitly so frozen builds can still render SVG/PNG icons when plugin discovery is incomplete.
+QT_PLUGIN_BINARIES = (
+    pyside6_library_info.collect_plugins("iconengines")
+    + pyside6_library_info.collect_plugins("imageformats")
+)
+
 # 官方 PyArrow hook 只收集 pyarrow 包目录内的 DLL；Conda 会把 Arrow 及其依赖放在 Library/bin，因此需额外收集该发行包的共享库依赖。
 # The official PyArrow hook only collects DLLs inside the pyarrow package; Conda stores Arrow and its dependencies in Library/bin, so those distribution DLLs must be added separately.
 PYARROW_BINARIES = collect_dynamic_libs("pyarrow")
@@ -57,7 +65,7 @@ WINDOWS_ICON = str(ROOT / "parqscan" / "resources" / "ParqScan.ico") if IS_WINDO
 analysis = Analysis(
     [str(ROOT / "main.py")],
     pathex=[str(ROOT)],
-    binaries=PYARROW_BINARIES,
+    binaries=PYARROW_BINARIES + QT_PLUGIN_BINARIES,
     datas=DATAS,
     hiddenimports=HIDDEN_IMPORTS,
     hookspath=[],

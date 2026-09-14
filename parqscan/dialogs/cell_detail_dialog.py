@@ -722,6 +722,7 @@ class RecordDetailDialog(QDialog):
         )
         self.setMinimumSize(900, 620)
         self.setSizeGripEnabled(True)
+        self.setWindowIcon(QApplication.windowIcon())
 
         self.header = CardFrame(object_name="DialogHeader")
         header_layout = QHBoxLayout(self.header)

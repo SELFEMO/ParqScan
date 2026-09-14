@@ -10,6 +10,8 @@ import traceback
 from pathlib import Path
 from typing import IO, Sequence
 
+from parqscan.utils.windows_shell import set_windows_app_user_model_id
+
 
 _FAULT_LOG_STREAM: IO[str] | None = None
 
@@ -87,27 +89,12 @@ def _show_startup_error(error: BaseException, log_path: Path | None) -> None:
     print(message, file=sys.stderr)
 
 
-def _create_app_icon():
-    from PySide6.QtGui import QIcon
-
-    from parqscan.utils.paths import resource_path
-
-    svg_path = resource_path("resources", "ParqScan.svg")
-    png_path = resource_path("resources", "ParqScan.png")
-    icon = QIcon(str(svg_path))
-
-    # SVG 仍是首选以保持高 DPI 清晰度，但打包环境缺少 SVG 图标引擎时必须回退到 PNG，避免窗口和任务栏图标为空。
-    # SVG remains preferred for high-DPI clarity, but a PNG fallback prevents blank window and taskbar icons when the packaged SVG icon engine is unavailable.
-    if icon.isNull() or icon.pixmap(64, 64).isNull():
-        icon = QIcon(str(png_path))
-    if icon.isNull() or icon.pixmap(64, 64).isNull():
-        raise RuntimeError(f"Application icon could not be loaded from {svg_path} or {png_path}")
-    return icon
-
-
 def main(arguments: Sequence[str] | None = None) -> int:
     _prepare_windowed_standard_streams()
     _enable_fault_logging()
+    # Windows 任务栏分组与图标身份必须在导入任何 Qt 模块之前建立，否则冻结产物可能仍显示 Python 默认图标。
+    # The Windows taskbar identity must be established before importing any Qt modules, or frozen builds may keep the default Python icon.
+    set_windows_app_user_model_id()
     args = list(arguments or sys.argv)
     smoke_test = "--smoke-test" in args
     args = [argument for argument in args if argument != "--smoke-test"]
@@ -118,8 +105,9 @@ def main(arguments: Sequence[str] | None = None) -> int:
         import PySide6.QtSvg  # noqa: F401
 
         from parqscan.application import run
+        from parqscan.utils.app_icon import create_app_icon
 
-        return run(args, _create_app_icon, smoke_test=smoke_test)
+        return run(args, create_app_icon, smoke_test=smoke_test)
     except BaseException as error:
         log_path = _record_startup_exception(error)
         _show_startup_error(error, log_path)
