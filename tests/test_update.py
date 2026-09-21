@@ -17,6 +17,7 @@ class VersioningTests(unittest.TestCase):
     def test_normalize_version_strips_v_prefix(self) -> None:
         self.assertEqual(normalize_version("v0.3.1"), "0.3.1")
         self.assertEqual(normalize_version("V1.2.3"), "1.2.3")
+        self.assertEqual(normalize_version("pre-release-v0.3.2"), "0.3.2")
 
     def test_version_tuple_parses_semver(self) -> None:
         self.assertEqual(version_tuple("0.3.1"), (0, 3, 1))
@@ -51,22 +52,35 @@ class GitHubReleaseTests(unittest.TestCase):
         self.assertEqual(release.release_page_url, payload["html_url"])
         self.assertEqual(release.body, "Release notes")
 
-    def test_fetch_latest_release_parses_json(self) -> None:
-        payload = {
-            "tag_name": "v0.3.2",
-            "html_url": "https://github.com/SELFEMO/ParqScan/releases/tag/v0.3.2",
-            "assets": [
-                {"name": "ParqScan-Windows-Setup.exe", "browser_download_url": "https://example.com/setup.exe"},
-            ],
-        }
+    def test_fetch_latest_release_picks_newest_including_prerelease(self) -> None:
+        payloads = [
+            {
+                "tag_name": "v0.3.1",
+                "draft": False,
+                "prerelease": False,
+                "html_url": "https://github.com/SELFEMO/ParqScan/releases/tag/v0.3.1",
+                "assets": [
+                    {"name": "ParqScan-Windows-Setup.exe", "browser_download_url": "https://example.com/031.exe"},
+                ],
+            },
+            {
+                "tag_name": "pre-release-v0.3.2",
+                "draft": False,
+                "prerelease": True,
+                "html_url": "https://github.com/SELFEMO/ParqScan/releases/tag/pre-release-v0.3.2",
+                "assets": [
+                    {"name": "ParqScan-Windows-Setup.exe", "browser_download_url": "https://example.com/032.exe"},
+                ],
+            },
+        ]
         response = unittest.mock.MagicMock()
         response.__enter__.return_value = response
         response.__exit__.return_value = False
         with patch("parqscan.update.github.urlopen", return_value=response):
-            with patch("parqscan.update.github.json.load", return_value=payload):
+            with patch("parqscan.update.github.json.load", return_value=payloads):
                 release = fetch_latest_release()
         self.assertEqual(release.version, "0.3.2")
-        self.assertEqual(release.download_url, "https://example.com/setup.exe")
+        self.assertEqual(release.download_url, "https://example.com/032.exe")
 
 
 class UpdateControllerTests(unittest.TestCase):

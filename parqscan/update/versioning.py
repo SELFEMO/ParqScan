@@ -10,8 +10,15 @@ def normalize_version(value: str) -> str:
     if not isinstance(value, str):
         return ""
     stripped = value.strip()
-    if stripped.casefold().startswith("v"):
-        stripped = stripped[1:].strip()
+    lowered = stripped.casefold()
+    for prefix in ("pre-release-v", "v"):
+        if lowered.startswith(prefix):
+            stripped = stripped[len(prefix) :].strip()
+            break
+    match = _VERSION_PATTERN.match(stripped)
+    if match:
+        major, minor, patch = match.groups()
+        return f"{int(major)}.{int(minor or 0)}.{int(patch or 0)}"
     return stripped
 
 

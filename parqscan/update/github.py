@@ -6,8 +6,8 @@ from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from parqscan.update.constants import RELEASE_API_URL, USER_AGENT, WINDOWS_ASSET_NAME
-from parqscan.update.versioning import normalize_version
+from parqscan.update.constants import RELEASES_LIST_API_URL, USER_AGENT, WINDOWS_ASSET_NAME
+from parqscan.update.versioning import compare_versions, normalize_version
 
 
 @dataclass(frozen=True)
@@ -51,7 +51,7 @@ def parse_release_payload(payload: dict[str, Any], asset_name: str = WINDOWS_ASS
     )
 
 
-def fetch_latest_release(api_url: str = RELEASE_API_URL, asset_name: str = WINDOWS_ASSET_NAME) -> ReleaseInfo:
+def _fetch_releases_payload(api_url: str = RELEASES_LIST_API_URL) -> list[dict[str, Any]]:
     request = Request(api_url, headers={"Accept": "application/vnd.github+json", "User-Agent": USER_AGENT})
     try:
         with urlopen(request, timeout=30) as response:
@@ -63,6 +63,22 @@ def fetch_latest_release(api_url: str = RELEASE_API_URL, asset_name: str = WINDO
     except json.JSONDecodeError as error:
         raise RuntimeError("GitHub API returned invalid JSON.") from error
 
-    if not isinstance(payload, dict):
-        raise RuntimeError("GitHub API returned an unexpected payload.")
-    return parse_release_payload(payload, asset_name)
+    if not isinstance(payload, list):
+        raise RuntimeError("GitHub API returned an unexpected releases payload.")
+    return [item for item in payload if isinstance(item, dict)]
+
+
+def fetch_latest_release(api_url: str = RELEASES_LIST_API_URL, asset_name: str = WINDOWS_ASSET_NAME) -> ReleaseInfo:
+    releases = _fetch_releases_payload(api_url)
+    published = [item for item in releases if not item.get("draft")]
+    if not published:
+        raise RuntimeError("No published releases were found on GitHub.")
+
+    best: ReleaseInfo | None = None
+    for payload in published:
+        release = parse_release_payload(payload, asset_name)
+        if best is None or compare_versions(release.version, best.version) > 0:
+            best = release
+    if best is None:
+        raise RuntimeError("No published releases were found on GitHub.")
+    return best
