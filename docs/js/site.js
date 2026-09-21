@@ -8,7 +8,7 @@
     lang: "zh",
     theme: "system",
     strings: {},
-    release: "0.3.2",
+    release: "0.3.3",
     repoUrl: "https://github.com/SELFEMO/ParqScan",
     licenseUrl: "https://www.apache.org/licenses/LICENSE-2.0.html",
     releaseApiUrl: "https://api.github.com/repos/SELFEMO/ParqScan/releases/latest",

@@ -106,6 +106,15 @@ class UiAssetTests(unittest.TestCase):
         self.assertIn("icon=self.app_icon", main_source)
         self.assertIn('self.translator.tr("about.title")', main_source)
 
+    def test_manual_update_check_uses_themed_feedback(self) -> None:
+        design_source = (ROOT / "parqscan" / "widgets" / "design_system.py").read_text(encoding="utf-8")
+        main_source = (ROOT / "parqscan" / "main_window.py").read_text(encoding="utf-8")
+        self.assertIn("class ChoiceDialog", design_source)
+        self.assertIn("def show_choice", design_source)
+        self.assertIn('self.translator.tr("update.checking")', main_source)
+        self.assertIn("show_choice(", main_source)
+        self.assertNotIn("QMessageBox", main_source)
+
     def test_message_dialog_and_page_size_are_dpi_safe(self) -> None:
         source = (ROOT / "parqscan" / "widgets" / "design_system.py").read_text(encoding="utf-8")
         self.assertIn("card_layout.setSizeConstraint(QLayout.SizeConstraint.SetFixedSize)", source)

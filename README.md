@@ -2,7 +2,7 @@
 
 [![GitHub release](https://img.shields.io/github/v/release/SELFEMO/ParqScan)](https://github.com/SELFEMO/ParqScan/releases/latest)
 
-当前版本 **0.3.2**。[下载 Windows 安装包](https://github.com/SELFEMO/ParqScan/releases/latest/download/ParqScan-Windows-Setup.exe) · 许可证：[Apache License 2.0](LICENSE)。
+当前版本 **0.3.3**。[下载 Windows 安装包](https://github.com/SELFEMO/ParqScan/releases/latest/download/ParqScan-Windows-Setup.exe) · 许可证：[Apache License 2.0](LICENSE)。
 
 ParqScan 是基于 PySide6 与 PyArrow 的跨平台桌面工具，用于检查 Parquet 文件、预览嵌入图片、查看二进制附件，并导出常见格式。读取按页进行，模型只保留当前页，避免把整份大文件物化进内存。
 

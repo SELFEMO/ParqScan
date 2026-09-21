@@ -5,10 +5,10 @@ import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from parqscan.config import ConfigManager
-from parqscan.update.controller import UpdateController
+from parqscan.update.controller import UpdateCheckWorker, UpdateController
 from parqscan.update.github import find_asset_url, fetch_latest_release, parse_release_payload
 from parqscan.update.versioning import compare_versions, normalize_version, version_tuple
 
@@ -109,6 +109,40 @@ class UpdateControllerTests(unittest.TestCase):
     def test_auto_check_disabled(self) -> None:
         controller, _path = self._make_controller({"auto_check_updates": False})
         self.assertFalse(controller._auto_check_enabled())
+
+    def test_manual_check_emits_busy_when_check_is_in_progress(self) -> None:
+        controller, _path = self._make_controller()
+        busy_calls: list[bool] = []
+        finished_calls: list[tuple[object, bool]] = []
+        controller.check_busy.connect(lambda: busy_calls.append(True))
+        controller.check_finished.connect(lambda result, manual: finished_calls.append((result, manual)))
+        controller._check_in_progress = True
+        controller.check_for_updates(manual=True)
+        self.assertEqual(busy_calls, [True])
+        self.assertEqual(finished_calls, [])
+
+    def test_worker_finished_preserves_manual_flag(self) -> None:
+        controller, _path = self._make_controller()
+        finished_calls: list[tuple[object, bool]] = []
+        controller.check_finished.connect(lambda result, manual: finished_calls.append((result, manual)))
+        controller._handle_check_worker_finished(None, True)
+        self.assertEqual(finished_calls, [(None, True)])
+        self.assertFalse(controller._check_in_progress)
+
+    def test_manual_check_does_not_record_last_update_check(self) -> None:
+        controller, _path = self._make_controller()
+        started: list[bool] = []
+        controller.check_started.connect(lambda manual: started.append(manual))
+        with patch.object(controller, "_record_check_time") as record_check:
+            with patch("parqscan.update.controller.QThread") as thread_cls:
+                thread = MagicMock()
+                thread.isRunning.return_value = False
+                thread_cls.return_value = thread
+                with patch.object(UpdateCheckWorker, "moveToThread"):
+                    controller.check_for_updates(manual=True)
+        record_check.assert_not_called()
+        self.assertEqual(started, [True])
+        thread.start.assert_called_once()
 
 
 if __name__ == "__main__":

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from PySide6.QtCore import QEvent, QPoint, QRectF, QSize, QTimer, Qt, Signal
 from PySide6.QtGui import (
     QBrush,
@@ -870,6 +872,98 @@ def show_message(
     icon: QIcon | QPixmap | None = None,
 ) -> None:
     MessageDialog(title, message, parent, critical=critical, icon=icon).exec()
+
+
+@dataclass(frozen=True)
+class ChoiceOption:
+    id: str
+    label: str
+    primary: bool = False
+    secondary: bool = False
+
+
+class ChoiceDialog(QDialog):
+    """Themed replacement for multi-button confirmation dialogs."""
+
+    def __init__(
+        self,
+        title: str,
+        message: str,
+        choices: list[ChoiceOption],
+        parent: QWidget | None = None,
+        *,
+        detail: str = "",
+    ) -> None:
+        super().__init__(parent)
+        self.setObjectName("MessageDialog")
+        self.setModal(True)
+        self.setWindowTitle(title)
+        self._selected_id = ""
+
+        card = CardFrame(object_name="MessageCard")
+        card.setMinimumWidth(410)
+        title_label = QLabel(title)
+        title_label.setObjectName("DialogTitle")
+        message_label = QLabel(message)
+        message_label.setObjectName("MessageText")
+        message_label.setWordWrap(True)
+        message_label.setMinimumWidth(320)
+        message_label.setMaximumWidth(430)
+
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(20, 18, 20, 16)
+        layout.setSpacing(10)
+        layout.addWidget(title_label)
+        layout.addWidget(message_label)
+        if detail:
+            detail_label = QLabel(detail)
+            detail_label.setObjectName("MutedLabel")
+            detail_label.setWordWrap(True)
+            detail_label.setMinimumWidth(320)
+            detail_label.setMaximumWidth(430)
+            layout.addWidget(detail_label)
+
+        actions = QHBoxLayout()
+        actions.setContentsMargins(0, 0, 0, 0)
+        actions.setSpacing(8)
+        actions.addStretch(1)
+        for choice in reversed(choices):
+            button = QPushButton(choice.label)
+            if choice.primary:
+                button.setProperty("primary", True)
+            elif choice.secondary:
+                button.setProperty("secondary", True)
+            button.clicked.connect(lambda checked=False, choice_id=choice.id: self._choose(choice_id))
+            actions.addWidget(button)
+        layout.addSpacing(4)
+        layout.addLayout(actions)
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(12, 12, 12, 12)
+        root.setSizeConstraint(QLayout.SizeConstraint.SetFixedSize)
+        root.addWidget(card)
+        self.adjustSize()
+
+    def _choose(self, choice_id: str) -> None:
+        self._selected_id = choice_id
+        self.accept()
+
+    def selected_id(self) -> str:
+        return self._selected_id
+
+
+def show_choice(
+    parent: QWidget | None,
+    title: str,
+    message: str,
+    choices: list[ChoiceOption],
+    *,
+    detail: str = "",
+) -> str | None:
+    dialog = ChoiceDialog(title, message, choices, parent, detail=detail)
+    if dialog.exec() != QDialog.DialogCode.Accepted:
+        return None
+    return dialog.selected_id() or None
 
 
 class ItemSelectionDialog(QDialog):

@@ -35,7 +35,7 @@ Users open files from the file dialog, drag-and-drop, recent files, or the comma
 - Supported image formats: JPEG, PNG, BMP, GIF, WEBP, TIFF, ICO, data URI, validated Base64; nested binary leaves are traversed.
 - Export: CSV, JSON, Excel, Markdown, SQL, Parquet fragments; batch image extraction.
 - Themes: light, dark, follow system. UI languages: Chinese and English.
-- Current release: 0.3.2 (see `parqscan/resources/release.json`).
+- Current release: 0.3.3 (see `parqscan/resources/release.json`).
 - License: Apache License 2.0.
 
 ## Brand Commitments

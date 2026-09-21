@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 from urllib.request import Request, urlopen
 
-from PySide6.QtCore import QObject, QThread, Signal, Slot
+from PySide6.QtCore import QObject, QThread, Qt, Signal, Slot
 
 from parqscan.config import ConfigManager
 from parqscan.release import release_name
@@ -26,8 +26,12 @@ class UpdateCheckResult:
 
 
 class UpdateCheckWorker(QObject):
-    finished = Signal(object)
-    failed = Signal(str)
+    finished = Signal(object, bool)
+    failed = Signal(str, bool)
+
+    def __init__(self, manual: bool) -> None:
+        super().__init__()
+        self.manual = manual
 
     @Slot()
     def run(self) -> None:
@@ -35,11 +39,11 @@ class UpdateCheckWorker(QObject):
             release = fetch_latest_release()
             current_version = release_name()
             if compare_versions(release.version, current_version) <= 0:
-                self.finished.emit(None)
+                self.finished.emit(None, self.manual)
                 return
-            self.finished.emit(UpdateCheckResult(release=release, current_version=current_version))
+            self.finished.emit(UpdateCheckResult(release=release, current_version=current_version), self.manual)
         except Exception as error:
-            self.failed.emit(str(error))
+            self.failed.emit(str(error), self.manual)
 
 
 class UpdateDownloadWorker(QObject):
@@ -77,6 +81,8 @@ class UpdateDownloadWorker(QObject):
 
 
 class UpdateController(QObject):
+    check_started = Signal(bool)
+    check_busy = Signal()
     check_finished = Signal(object, bool)
     check_failed = Signal(str, bool)
     download_progress = Signal(int, int)
@@ -89,6 +95,7 @@ class UpdateController(QObject):
         self._check_thread: QThread | None = None
         self._download_thread: QThread | None = None
         self._pending_release: ReleaseInfo | None = None
+        self._check_in_progress = False
 
     def maybe_auto_check(self) -> None:
         if not self._auto_check_enabled():
@@ -98,22 +105,28 @@ class UpdateController(QObject):
         self.check_for_updates(manual=False)
 
     def check_for_updates(self, manual: bool = False) -> None:
-        if self._check_thread is not None and self._check_thread.isRunning():
+        if self._check_in_progress:
+            if manual:
+                self.check_busy.emit()
             return
-        if manual or self._should_check_now():
+        if not manual and not self._should_check_now():
+            return
+        if not manual:
             self._record_check_time()
+        self._check_in_progress = True
         thread = QThread(self)
-        worker = UpdateCheckWorker()
+        worker = UpdateCheckWorker(manual)
         worker.moveToThread(thread)
         thread.started.connect(worker.run)
-        worker.finished.connect(lambda result: self._on_check_finished(result, manual))
-        worker.failed.connect(lambda message: self._on_check_failed(message, manual))
+        worker.finished.connect(self._handle_check_worker_finished, Qt.ConnectionType.QueuedConnection)
+        worker.failed.connect(self._handle_check_worker_failed, Qt.ConnectionType.QueuedConnection)
         worker.finished.connect(thread.quit)
         worker.failed.connect(thread.quit)
         thread.finished.connect(worker.deleteLater)
         thread.finished.connect(thread.deleteLater)
         thread.finished.connect(self._clear_check_thread)
         self._check_thread = thread
+        self.check_started.emit(manual)
         thread.start()
 
     def is_dismissed(self, version: str) -> bool:
@@ -140,9 +153,9 @@ class UpdateController(QObject):
         worker = UpdateDownloadWorker(release.download_url, target)
         worker.moveToThread(thread)
         thread.started.connect(worker.run)
-        worker.progress.connect(self.download_progress.emit)
-        worker.finished.connect(self._on_download_finished)
-        worker.failed.connect(self.download_failed.emit)
+        worker.progress.connect(self.download_progress.emit, Qt.ConnectionType.QueuedConnection)
+        worker.finished.connect(self._on_download_finished, Qt.ConnectionType.QueuedConnection)
+        worker.failed.connect(self.download_failed.emit, Qt.ConnectionType.QueuedConnection)
         worker.finished.connect(thread.quit)
         worker.failed.connect(thread.quit)
         thread.finished.connect(worker.deleteLater)
@@ -191,12 +204,17 @@ class UpdateController(QObject):
     def _record_check_time(self) -> None:
         self.config.set("last_update_check", datetime.now(timezone.utc).isoformat())
 
-    def _on_check_finished(self, result: Any, manual: bool) -> None:
+    @Slot(object, bool)
+    def _handle_check_worker_finished(self, result: Any, manual: bool) -> None:
+        self._check_in_progress = False
         self.check_finished.emit(result, manual)
 
-    def _on_check_failed(self, message: str, manual: bool) -> None:
+    @Slot(str, bool)
+    def _handle_check_worker_failed(self, message: str, manual: bool) -> None:
+        self._check_in_progress = False
         self.check_failed.emit(message, manual)
 
+    @Slot(str)
     def _on_download_finished(self, installer_path: str) -> None:
         self.download_finished.emit(installer_path)
 

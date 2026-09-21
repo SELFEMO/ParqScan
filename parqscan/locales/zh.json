@@ -207,6 +207,8 @@
   "update": {
     "check": "检查更新",
     "checking": "正在检查更新…",
+    "checking_title": "检查更新",
+    "already_checking": "正在检查更新，请稍候…",
     "available_title": "发现新版本",
     "available_text": "ParqScan {version} 已发布，当前版本为 {current}。",
     "install_now": "立即更新",

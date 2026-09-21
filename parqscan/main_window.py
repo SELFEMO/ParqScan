@@ -19,7 +19,6 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QMainWindow,
-    QMessageBox,
     QProgressDialog,
     QPushButton,
     QSplitter,
@@ -39,7 +38,7 @@ from parqscan.themes import ThemeManager
 from parqscan.update.controller import UpdateCheckResult, UpdateController
 from parqscan.utils.binary import format_size
 from parqscan.utils.icons import make_icon
-from parqscan.widgets.design_system import EmptyState, RoundedComboBox, RoundedMenu, show_message
+from parqscan.widgets.design_system import ChoiceOption, EmptyState, RoundedComboBox, RoundedMenu, show_choice, show_message
 from parqscan.widgets.document_widget import DocumentWidget
 
 
@@ -71,6 +70,7 @@ class MainWindow(QMainWindow):
         self._threads: list[QThread] = []
         self._worker_contexts: dict[object, tuple[QProgressDialog, QThread, Callable[[object], None]]] = {}
         self._update_progress: QProgressDialog | None = None
+        self._update_check_progress: QProgressDialog | None = None
         self.setWindowIcon(app_icon)
         self.setAcceptDrops(True)
         self.resize(1380, 860)
@@ -244,6 +244,8 @@ class MainWindow(QMainWindow):
         self.about_action.triggered.connect(self.show_about)
         self.help_menu.addAction(self.about_action)
         if self.update_controller is not None:
+            self.update_controller.check_started.connect(self._on_update_check_started)
+            self.update_controller.check_busy.connect(self._on_update_check_busy)
             self.update_controller.check_finished.connect(self._on_update_check_finished)
             self.update_controller.check_failed.connect(self._on_update_check_failed)
             self.update_controller.download_progress.connect(self._on_update_download_progress)
@@ -489,11 +491,43 @@ class MainWindow(QMainWindow):
     def check_updates_manual(self) -> None:
         if self.update_controller is None:
             return
-        self.check_updates_action.setEnabled(False)
         self.update_controller.check_for_updates(manual=True)
 
+    def _on_update_check_started(self, manual: bool) -> None:
+        if not manual:
+            return
+        self._close_update_check_progress()
+        progress = QProgressDialog(
+            self.translator.tr("update.checking"),
+            "",
+            0,
+            0,
+            self,
+        )
+        progress.setObjectName("TaskProgressDialog")
+        progress.setWindowTitle(self.translator.tr("update.checking_title"))
+        progress.setWindowModality(Qt.WindowModality.WindowModal)
+        progress.setMinimumDuration(0)
+        progress.setCancelButton(None)
+        progress.setAutoClose(False)
+        progress.setRange(0, 0)
+        progress.show()
+        self._update_check_progress = progress
+
+    def _on_update_check_busy(self) -> None:
+        show_message(
+            self,
+            self.translator.tr("update.checking_title"),
+            self.translator.tr("update.already_checking"),
+        )
+
+    def _close_update_check_progress(self) -> None:
+        if self._update_check_progress is not None:
+            self._update_check_progress.close()
+            self._update_check_progress = None
+
     def _on_update_check_finished(self, result: object, manual: bool) -> None:
-        self.check_updates_action.setEnabled(True)
+        self._close_update_check_progress()
         if result is None:
             if manual:
                 show_message(
@@ -509,7 +543,7 @@ class MainWindow(QMainWindow):
         self._prompt_update(result)
 
     def _on_update_check_failed(self, message: str, manual: bool) -> None:
-        self.check_updates_action.setEnabled(True)
+        self._close_update_check_progress()
         if not manual:
             return
         show_message(
@@ -523,29 +557,31 @@ class MainWindow(QMainWindow):
         if self.update_controller is None:
             return
         self.update_controller.set_pending_release(result.release)
-        dialog = QMessageBox(self)
-        dialog.setWindowTitle(self.translator.tr("update.available_title"))
-        dialog.setText(
+        detail = ""
+        if not UpdateController.can_install_in_place() or not result.release.download_url:
+            detail = self.translator.tr("update.non_windows_text")
+        choice = show_choice(
+            self,
+            self.translator.tr("update.available_title"),
             self.translator.tr(
                 "update.available_text",
                 version=result.release.version,
                 current=result.current_version,
-            )
+            ),
+            [
+                ChoiceOption("release", self.translator.tr("update.open_release"), secondary=True),
+                ChoiceOption("later", self.translator.tr("update.later"), secondary=True),
+                ChoiceOption("install", self.translator.tr("update.install_now"), primary=True),
+            ],
+            detail=detail,
         )
-        install_button = dialog.addButton(self.translator.tr("update.install_now"), QMessageBox.ButtonRole.AcceptRole)
-        later_button = dialog.addButton(self.translator.tr("update.later"), QMessageBox.ButtonRole.RejectRole)
-        release_button = dialog.addButton(self.translator.tr("update.open_release"), QMessageBox.ButtonRole.ActionRole)
-        if not UpdateController.can_install_in_place() or not result.release.download_url:
-            dialog.setInformativeText(self.translator.tr("update.non_windows_text"))
-        dialog.exec()
-        clicked = dialog.clickedButton()
-        if clicked == later_button:
+        if choice == "later":
             self.update_controller.dismiss_version(result.release.version)
             return
-        if clicked == release_button:
+        if choice == "release":
             webbrowser.open(result.release.release_page_url or UpdateController.releases_page_url())
             return
-        if clicked != install_button:
+        if choice != "install":
             return
         if UpdateController.can_install_in_place() and result.release.download_url:
             self._start_update_download(result.release)
