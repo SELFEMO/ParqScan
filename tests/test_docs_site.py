@@ -41,8 +41,14 @@ class DocsSiteTests(unittest.TestCase):
         for page in ("index.html", "guide.html", "404.html"):
             content = (DOCS / page).read_text(encoding="utf-8")
             self.assertIn('src="js/i18n.js"', content, page)
+            self.assertIn('src="js/release.js"', content, page)
             self.assertLess(
                 content.index('src="js/i18n.js"'),
+                content.index('src="js/site.js"'),
+                page,
+            )
+            self.assertLess(
+                content.index('src="js/release.js"'),
                 content.index('src="js/site.js"'),
                 page,
             )
@@ -96,6 +102,20 @@ class DocsSiteTests(unittest.TestCase):
         site = json.loads((DOCS / "site.json").read_text(encoding="utf-8"))
         self.assertTrue(site.get("repoUrl", "").startswith("https://github.com/"))
         self.assertTrue(site.get("licenseUrl", "").startswith("https://www.apache.org/licenses/"))
+        self.assertIn("/releases/latest", site.get("releaseApiUrl", ""))
+        self.assertEqual(site.get("windowsAssetName"), "ParqScan-Windows-Setup.exe")
+
+    def test_index_has_release_download_button(self) -> None:
+        index = (DOCS / "index.html").read_text(encoding="utf-8")
+        self.assertIn("data-release-download", index)
+        self.assertIn('src="js/release.js"', index)
+
+    def test_docs_version_matches_app_release(self) -> None:
+        app_release = json.loads((ROOT / "parqscan" / "resources" / "release.json").read_text(encoding="utf-8"))[
+            "release"
+        ]
+        docs_release = json.loads((DOCS / "version.json").read_text(encoding="utf-8"))["release"]
+        self.assertEqual(app_release, docs_release)
 
     def test_no_root_absolute_paths_in_docs_html(self) -> None:
         pattern = re.compile(r'(?:href|src)="/(?!/)')

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import webbrowser
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
@@ -10,6 +11,7 @@ from PySide6.QtCore import QSize, QThread, QTimer, Qt
 from PySide6.QtGui import QAction, QActionGroup, QDragEnterEvent, QDropEvent, QIcon
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QApplication,
     QFileDialog,
     QFrame,
     QHBoxLayout,
@@ -17,6 +19,7 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QMainWindow,
+    QMessageBox,
     QProgressDialog,
     QPushButton,
     QSplitter,
@@ -33,6 +36,7 @@ from parqscan.dialogs.range_export_dialog import RangeExportDialog
 from parqscan.i18n import Translator
 from parqscan.release import release_name
 from parqscan.themes import ThemeManager
+from parqscan.update.controller import UpdateCheckResult, UpdateController
 from parqscan.utils.binary import format_size
 from parqscan.utils.icons import make_icon
 from parqscan.widgets.design_system import EmptyState, RoundedComboBox, RoundedMenu, show_message
@@ -54,16 +58,19 @@ class MainWindow(QMainWindow):
         translator: Translator,
         theme_manager: ThemeManager,
         app_icon: QIcon,
+        update_controller: UpdateController | None = None,
     ) -> None:
         super().__init__()
         self.config = config
         self.translator = translator
         self.theme_manager = theme_manager
         self.app_icon = app_icon
+        self.update_controller = update_controller
         self.contexts: list[DocumentContext] = []
         self._open_sequence = 0
         self._threads: list[QThread] = []
         self._worker_contexts: dict[object, tuple[QProgressDialog, QThread, Callable[[object], None]]] = {}
+        self._update_progress: QProgressDialog | None = None
         self.setWindowIcon(app_icon)
         self.setAcceptDrops(True)
         self.resize(1380, 860)
@@ -230,9 +237,18 @@ class MainWindow(QMainWindow):
         self.language_actions[self.translator.language].setChecked(True)
 
         self.help_menu = add_rounded_menu()
+        self.check_updates_action = QAction(self)
+        self.check_updates_action.triggered.connect(self.check_updates_manual)
+        self.help_menu.addAction(self.check_updates_action)
         self.about_action = QAction(self)
         self.about_action.triggered.connect(self.show_about)
         self.help_menu.addAction(self.about_action)
+        if self.update_controller is not None:
+            self.update_controller.check_finished.connect(self._on_update_check_finished)
+            self.update_controller.check_failed.connect(self._on_update_check_failed)
+            self.update_controller.download_progress.connect(self._on_update_download_progress)
+            self.update_controller.download_finished.connect(self._on_update_download_finished)
+            self.update_controller.download_failed.connect(self._on_update_download_failed)
         self._rebuild_recent_menu()
 
     def current_context(self) -> DocumentContext | None:
@@ -470,6 +486,113 @@ class MainWindow(QMainWindow):
             action.setToolTip(path)
             action.triggered.connect(lambda checked=False, recent_path=path: self.open_path(recent_path))
 
+    def check_updates_manual(self) -> None:
+        if self.update_controller is None:
+            return
+        self.check_updates_action.setEnabled(False)
+        self.update_controller.check_for_updates(manual=True)
+
+    def _on_update_check_finished(self, result: object, manual: bool) -> None:
+        self.check_updates_action.setEnabled(True)
+        if result is None:
+            if manual:
+                show_message(
+                    self,
+                    self.translator.tr("update.up_to_date_title"),
+                    self.translator.tr("update.up_to_date_text", release=release_name()),
+                )
+            return
+        if not isinstance(result, UpdateCheckResult):
+            return
+        if not manual and self.update_controller is not None and self.update_controller.is_dismissed(result.release.version):
+            return
+        self._prompt_update(result)
+
+    def _on_update_check_failed(self, message: str, manual: bool) -> None:
+        self.check_updates_action.setEnabled(True)
+        if not manual:
+            return
+        show_message(
+            self,
+            self.translator.tr("common.error"),
+            self.translator.tr("update.check_failed", error=message),
+            critical=True,
+        )
+
+    def _prompt_update(self, result: UpdateCheckResult) -> None:
+        if self.update_controller is None:
+            return
+        self.update_controller.set_pending_release(result.release)
+        dialog = QMessageBox(self)
+        dialog.setWindowTitle(self.translator.tr("update.available_title"))
+        dialog.setText(
+            self.translator.tr(
+                "update.available_text",
+                version=result.release.version,
+                current=result.current_version,
+            )
+        )
+        install_button = dialog.addButton(self.translator.tr("update.install_now"), QMessageBox.ButtonRole.AcceptRole)
+        later_button = dialog.addButton(self.translator.tr("update.later"), QMessageBox.ButtonRole.RejectRole)
+        release_button = dialog.addButton(self.translator.tr("update.open_release"), QMessageBox.ButtonRole.ActionRole)
+        if not UpdateController.can_install_in_place() or not result.release.download_url:
+            dialog.setInformativeText(self.translator.tr("update.non_windows_text"))
+        dialog.exec()
+        clicked = dialog.clickedButton()
+        if clicked == later_button:
+            self.update_controller.dismiss_version(result.release.version)
+            return
+        if clicked == release_button:
+            webbrowser.open(result.release.release_page_url or UpdateController.releases_page_url())
+            return
+        if clicked != install_button:
+            return
+        if UpdateController.can_install_in_place() and result.release.download_url:
+            self._start_update_download(result.release)
+            return
+        webbrowser.open(result.release.release_page_url or UpdateController.releases_page_url())
+
+    def _start_update_download(self, release) -> None:
+        if self.update_controller is None:
+            return
+        progress = QProgressDialog(self.translator.tr("update.downloading"), "", 0, 100, self)
+        progress.setObjectName("TaskProgressDialog")
+        progress.setWindowModality(Qt.WindowModality.WindowModal)
+        progress.setMinimumDuration(0)
+        progress.setCancelButton(None)
+        progress.setAutoClose(False)
+        progress.show()
+        self._update_progress = progress
+        self.update_controller.download_and_install(release)
+
+    def _on_update_download_progress(self, downloaded: int, total: int) -> None:
+        if self._update_progress is None:
+            return
+        self._update_progress.setMaximum(max(total, 1))
+        self._update_progress.setValue(min(downloaded, total if total > 0 else downloaded))
+
+    def _on_update_download_finished(self, installer_path: str) -> None:
+        if self._update_progress is not None:
+            self._update_progress.close()
+            self._update_progress = None
+        show_message(self, self.translator.tr("update.available_title"), self.translator.tr("update.installing"))
+        UpdateController.launch_installer(installer_path)
+        QApplication.instance().quit()
+
+    def _on_update_download_failed(self, message: str) -> None:
+        if self._update_progress is not None:
+            self._update_progress.close()
+            self._update_progress = None
+        error_text = message
+        if message == "missing_download_url":
+            error_text = self.translator.tr("update.non_windows_text")
+        show_message(
+            self,
+            self.translator.tr("common.error"),
+            self.translator.tr("update.download_failed", error=error_text),
+            critical=True,
+        )
+
     def show_about(self) -> None:
         # 中文：关于窗口应展示项目自身 Logo，避免通用信息或警告图标削弱品牌识别。
         # English: The About dialog uses the product logo so generic information or warning symbols never replace the application identity.
@@ -514,6 +637,7 @@ class MainWindow(QMainWindow):
         self.language_actions["en"].setText("English")
         self.language_actions["zh"].setText("中文")
         self.help_menu.setTitle(self.translator.tr("menu.help"))
+        self.check_updates_action.setText(self.translator.tr("update.check"))
         self.about_action.setText(self.translator.tr("about.title"))
         self.coordinate_status.setText(self.translator.tr("status.no_selection"))
         self._update_rows_status(self.current_context().widget.data_widget.model.loaded_rows if self.current_context() else 0)

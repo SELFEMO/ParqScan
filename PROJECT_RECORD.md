@@ -2,6 +2,44 @@
 
 按日期记录重要修改及原因。同一天内相关改动已合并，更早条目保持原顺序。
 
+## 2026-09-21 — v0.3.2：预发布验证（更新流程）
+
+### 修改内容
+
+- 版本号升至 **0.3.2**；以 `pre-release-v0.3.2` tag 发布 GitHub Pre-release，供本地安装后验证「检查更新」流程。
+- 新增 `scripts/build_windows.cmd`：在 `conda activate py312` 环境下用 cmd 构建安装包。
+
+### 设计原因
+
+在正式发布前，用高于当前安装版本的预发布包验证更新检测、下载与静默安装链路。
+
+## 2026-09-21 — v0.3.1：GitHub 更新机制与轻量化构建
+
+### 修改内容
+
+- 版本号升至 **0.3.1**；新增 `parqscan/update/`（GitHub API、版本比较、下载安装、配置节流）。
+- 帮助菜单「检查更新」；启动后延迟 3 秒自动检查（每日最多一次，用户确认后才下载安装）。
+- Windows 安装版下载 `ParqScan-Windows-Setup.exe` 并以 `/SILENT /CLOSEAPPLICATIONS` 安装；其他平台引导打开 Release 页面。
+- 扩展 `ParqScan.spec` 排除列表；`build.py` 检测膨胀依赖并校验 onedir 体积（>600MB 失败）。
+- 新增 `scripts/build_windows.ps1`（干净 pip venv 构建）；Release CI 增加体积门禁。
+
+### 设计原因
+
+v0.3.0 在 Anaconda base 环境本地打包曾产生约 1.29GB 安装包，根因是构建环境混入无关科学计算栈。v0.3.1 通过干净环境构建护栏与更新机制，让发布体积回到合理范围，并让已安装用户可发现新版本。
+
+## 2026-09-21 — v0.3.0：Windows 安装包与 Release 下载映射
+
+### 修改内容
+
+- 版本号升至 **0.3.0**；新增 `scripts/sync_release_metadata.py` 从 `parqscan/resources/release.json` 同步 docs 与 README。
+- 新增 Inno Setup 脚本 `packaging/inno/ParqScan.iss`；`build.py --installer` 生成 `dist/installer/ParqScan-Windows-Setup.exe`。
+- 新增 `.github/workflows/release.yml`：推送 `v*` tag 时在 Windows 上自动构建并上传安装包。
+- README 与 GitHub Pages 通过固定资产名 `ParqScan-Windows-Setup.exe` 与 GitHub Releases API 映射最新下载链接。
+
+### 设计原因
+
+v0.3 系列聚焦 Windows 分发体验：用户从 Release 直接安装，站点与 README 无需每次手改下载 URL；开发者仍可用 PyInstaller 本地打包。
+
 ## 2026-09-14 — 修复 Windows 打包后任务栏图标丢失
 
 ### 修改内容

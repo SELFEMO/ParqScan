@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 from typing import Callable, Sequence
 
+from PySide6.QtCore import QTimer
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 
@@ -13,6 +14,7 @@ from parqscan.i18n import Translator
 from parqscan.main_window import MainWindow
 from parqscan.release import release_name
 from parqscan.themes import ThemeManager
+from parqscan.update.controller import UpdateController
 
 
 def _command_line_paths(arguments: Sequence[str]) -> list[str]:
@@ -44,7 +46,8 @@ def run(
     icon = icon_factory() if icon_factory is not None else QIcon()
     application.setWindowIcon(icon)
 
-    window = MainWindow(config, translator, themes, icon)
+    update_controller = UpdateController(config)
+    window = MainWindow(config, translator, themes, icon, update_controller)
 
     # 构建后的冒烟测试只验证依赖、Qt 平台插件和资源能完整初始化，不进入事件循环可避免 CI 或无显示器环境挂起。
     # The packaged smoke test validates dependencies, the Qt platform plugin, and resources without entering the event loop, avoiding hangs in CI or display-less environments.
@@ -55,6 +58,7 @@ def run(
         return 0
 
     window.show()
+    QTimer.singleShot(3000, update_controller.maybe_auto_check)
     for path in _command_line_paths(args):
         window.open_path(path)
     return application.exec()

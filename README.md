@@ -1,6 +1,8 @@
 # ParqScan
 
-当前版本 **0.2.5**。许可证：[Apache License 2.0](LICENSE)。
+[![GitHub release](https://img.shields.io/github/v/release/SELFEMO/ParqScan)](https://github.com/SELFEMO/ParqScan/releases/latest)
+
+当前版本 **0.3.2**。[下载 Windows 安装包](https://github.com/SELFEMO/ParqScan/releases/latest/download/ParqScan-Windows-Setup.exe) · 许可证：[Apache License 2.0](LICENSE)。
 
 ParqScan 是基于 PySide6 与 PyArrow 的跨平台桌面工具，用于检查 Parquet 文件、预览嵌入图片、查看二进制附件，并导出常见格式。读取按页进行，模型只保留当前页，避免把整份大文件物化进内存。
 
@@ -29,6 +31,10 @@ ParqScan 是基于 PySide6 与 PyArrow 的跨平台桌面工具，用于检查 P
 - 浅色 / 深色 / 跟随系统，中英文切换。
 - 菜单、下拉、表格与消息窗口使用同一套圆角设计系统。
 
+## 下载
+
+Windows 用户推荐直接安装 [最新 Release 中的 `ParqScan-Windows-Setup.exe`](https://github.com/SELFEMO/ParqScan/releases/latest/download/ParqScan-Windows-Setup.exe)。该链接始终指向最新版本，无需随版本号手动更新。
+
 ## 安装与运行
 
 需要 Python 3，以及 [requirements.txt](requirements.txt) 中的依赖（PySide6、PyArrow、openpyxl、psutil）。
@@ -52,11 +58,49 @@ python -m unittest discover -s tests -v
 
 ## 打包
 
-```bash
-python build.py
+**推荐在干净的 pip 虚拟环境中构建。** 若在 Anaconda base 等环境中直接运行 `python build.py`，PyInstaller 可能沿依赖图拉入 pandas、notebook、MKL 等无关包，导致 `dist/ParqScan` 膨胀到约 1 GB 以上。干净环境通常约 250–450 MB。
+
+发布用干净构建（推荐，体积更小）：
+
+```powershell
+winget install --id Python.Python.3.12 -e
+.\scripts\build_windows.ps1
 ```
 
-Windows 默认目录模式，产物为 `dist/ParqScan/ParqScan.exe`。需要单文件时使用 `python build.py --onefile`；启动失败排查可用 `python build.py --debug`。构建配置固定 PySide6，并为 Conda 环境补收集 PyArrow 动态库。生产构建若启动失败，错误写入用户应用数据目录 `ParqScan/logs/startup.log`。
+本地 Conda 环境（`py312`）快速构建（cmd）：
+
+```bat
+scripts\build_windows.cmd
+```
+
+若本机同时装有多个 Python，PowerShell 脚本可指定：`$env:PARQSCAN_BUILD_PYTHON = "C:\Path\To\python.exe"`
+
+手动构建：
+
+```bash
+python build.py
+python build.py --installer
+```
+
+Windows 默认目录模式，产物为 `dist/ParqScan/ParqScan.exe`；`python build.py --installer` 会额外生成 `dist/installer/ParqScan-Windows-Setup.exe`（需先安装 [Inno Setup 6](https://jrsoftware.org/isdl.php)）。若 PyInstaller 已完成，可单独打安装包：
+
+```bash
+python build.py --installer-only
+```
+
+安装 Inno Setup 示例：`winget install --id JRSoftware.InnoSetup -e`
+
+需要单文件时使用 `python build.py --onefile`；启动失败排查可用 `python build.py --debug`。构建配置固定 PySide6，并为 Conda 环境补收集 PyArrow 动态库（Conda 构建会打印警告，发布包仍应在 pip venv 或 CI 中生成）。生产构建若启动失败，错误写入用户应用数据目录 `ParqScan/logs/startup.log`。
+
+本地验证体积：
+
+```powershell
+Get-ChildItem dist\ParqScan -Recurse | Measure-Object -Property Length -Sum
+```
+
+打 tag（如 `v0.3.1`）后，GitHub Actions 会自动构建并上传 Windows 安装包到 Release；若 onedir 超过 600 MB 则 CI 失败。发布前请运行 `python scripts/sync_release_metadata.py` 同步文档与 README 中的版本号。
+
+桌面端（Windows 安装版）支持帮助菜单「检查更新」，并在启动后每日最多自动检查一次；发现新版本后需用户确认才会下载并安装。
 
 ## 可移植配置
 

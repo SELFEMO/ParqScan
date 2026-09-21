@@ -8,9 +8,12 @@
     lang: "zh",
     theme: "system",
     strings: {},
-    release: "0.2.5",
+    release: "0.3.2",
     repoUrl: "https://github.com/SELFEMO/ParqScan",
     licenseUrl: "https://www.apache.org/licenses/LICENSE-2.0.html",
+    releaseApiUrl: "https://api.github.com/repos/SELFEMO/ParqScan/releases/latest",
+    windowsAssetName: "ParqScan-Windows-Setup.exe",
+    releaseDownloadUrl: "",
     demoPage: 0,
     demoPageSize: 20,
   };
@@ -123,6 +126,46 @@
     }
   }
 
+  function applyReleaseLinks() {
+    const fallback = window.ParqScanRelease?.latestDownloadUrl(state.repoUrl, state.windowsAssetName) || "";
+    const downloadUrl = state.releaseDownloadUrl || fallback;
+
+    document.querySelectorAll("[data-release-download]").forEach((el) => {
+      if (downloadUrl) {
+        el.href = downloadUrl;
+      } else if (state.repoUrl) {
+        el.href = window.ParqScanRelease?.releasesPageUrl(state.repoUrl) || state.repoUrl;
+      }
+    });
+  }
+
+  async function loadLatestRelease() {
+    const releaseApi = window.ParqScanRelease;
+    if (!state.releaseApiUrl || !releaseApi) {
+      return;
+    }
+
+    try {
+      const response = await fetch(state.releaseApiUrl, {
+        headers: { Accept: "application/vnd.github+json" },
+      });
+      if (!response.ok) {
+        throw new Error(`Release API failed: ${response.status}`);
+      }
+      const payload = await response.json();
+      const normalized = releaseApi.normalizeTag(payload.tag_name);
+      if (normalized) {
+        state.release = normalized;
+      }
+      const assetUrl = releaseApi.findAssetUrl(payload.assets, state.windowsAssetName);
+      if (assetUrl) {
+        state.releaseDownloadUrl = assetUrl;
+      }
+    } catch (_error) {
+      /* fall back to version.json and releases/latest */
+    }
+  }
+
   function applyI18n() {
     applyMeta();
 
@@ -163,6 +206,8 @@
       const note = exportSection.note ? `<li>${exportSection.note}</li>` : "";
       exportList.innerHTML = items + note;
     }
+
+    applyReleaseLinks();
   }
 
   function demoTotalPages() {
@@ -328,11 +373,19 @@
     try {
       const [version, site] = await Promise.all([
         loadJson("version.json").catch(() => ({ release: state.release })),
-        loadJson("site.json").catch(() => ({ repoUrl: state.repoUrl, licenseUrl: state.licenseUrl })),
+        loadJson("site.json").catch(() => ({
+          repoUrl: state.repoUrl,
+          licenseUrl: state.licenseUrl,
+          releaseApiUrl: state.releaseApiUrl,
+          windowsAssetName: state.windowsAssetName,
+        })),
       ]);
       state.release = version.release || state.release;
       state.repoUrl = site.repoUrl || state.repoUrl;
       state.licenseUrl = site.licenseUrl || state.licenseUrl;
+      state.releaseApiUrl = site.releaseApiUrl || state.releaseApiUrl;
+      state.windowsAssetName = site.windowsAssetName || state.windowsAssetName;
+      await loadLatestRelease();
     } catch (_error) {
       /* keep defaults */
     }

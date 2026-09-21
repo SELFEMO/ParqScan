@@ -1,4 +1,6 @@
 {
   "repoUrl": "https://github.com/SELFEMO/ParqScan",
-  "licenseUrl": "https://www.apache.org/licenses/LICENSE-2.0.html"
+  "licenseUrl": "https://www.apache.org/licenses/LICENSE-2.0.html",
+  "releaseApiUrl": "https://api.github.com/repos/SELFEMO/ParqScan/releases/latest",
+  "windowsAssetName": "ParqScan-Windows-Setup.exe"
 }

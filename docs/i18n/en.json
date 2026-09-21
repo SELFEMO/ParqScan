@@ -24,7 +24,8 @@
   "hero": {
     "title": "One Parquet page at a time",
     "lead": "ParqScan never materializes a whole large file into memory. The data view uses fixed paging—the table model keeps only the current page and reads the next window from disk when you turn the page.",
-    "ctaGuide": "Get started",
+    "ctaDownload": "Download for Windows",
+    "ctaGuide": "User guide",
     "ctaSource": "View source",
     "demoLabel": "Interactive demo (not a real file)",
     "memoryNote": "Only this page is in memory",
@@ -132,7 +133,7 @@
     },
     "packaging": {
       "title": "Packaging",
-      "body": "Run python build.py for a PyInstaller build. Windows defaults to dist/ParqScan/ParqScan.exe (onedir); use --onefile for a single executable. Check ParqScan/logs/startup.log in app data if startup fails."
+      "body": "On Windows, download ParqScan-Windows-Setup.exe from GitHub Releases for the recommended installer. Developers can run python build.py --installer on Windows to build the installer locally, or package dist/ParqScan/ParqScan.exe (onedir) or use --onefile. Check ParqScan/logs/startup.log in app data if startup fails."
     },
     "license": {
       "title": "License",

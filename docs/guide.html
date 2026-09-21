@@ -115,8 +115,9 @@ python main.py</code></pre>
 
         <section class="guide-section" id="packaging">
           <h2 data-i18n="guide.packaging.title">打包</h2>
-          <p data-i18n="guide.packaging.body">运行 python build.py 生成 PyInstaller 产物。Windows 默认为 dist/ParqScan/ParqScan.exe 目录模式；单文件使用 --onefile。启动失败可查看用户应用数据目录 ParqScan/logs/startup.log。</p>
+          <p data-i18n="guide.packaging.body">Windows 推荐通过 GitHub Release 下载 ParqScan-Windows-Setup.exe 安装包。开发者可在 Windows 上运行 python build.py --installer 生成安装包；也可仅打包为 dist/ParqScan/ParqScan.exe（目录模式）或使用 --onefile。启动失败可查看用户应用数据目录 ParqScan/logs/startup.log。</p>
           <pre><code>python build.py
+python build.py --installer
 python build.py --onefile</code></pre>
         </section>
 
@@ -130,7 +131,7 @@ python build.py --onefile</code></pre>
     <footer class="site-footer">
       <div class="shell site-footer__inner">
         <p class="site-footer__meta">
-          <span data-version>版本 0.2.5</span>
+          <span data-version>版本 0.3.2</span>
           <span class="site-footer__sep" aria-hidden="true">·</span>
           <a href="https://www.apache.org/licenses/LICENSE-2.0.html" data-license-link rel="noopener noreferrer" target="_blank" data-i18n="footer.license">Apache License 2.0</a>
           <span class="site-footer__sep" aria-hidden="true">·</span>
@@ -140,6 +141,7 @@ python build.py --onefile</code></pre>
     </footer>
 
     <script src="js/i18n.js"></script>
+    <script src="js/release.js"></script>
     <script src="js/site.js" defer></script>
   </body>
 </html>

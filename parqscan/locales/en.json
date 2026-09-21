@@ -203,5 +203,21 @@
   "about": {
     "title": "About ParqScan",
     "text": "ParqScan {release} is a desktop inspector and converter for Parquet files, embedded images, and binary attachments. Licensed under the Apache License, Version 2.0."
+  },
+  "update": {
+    "check": "Check for updates",
+    "checking": "Checking for updates…",
+    "available_title": "Update available",
+    "available_text": "ParqScan {version} is available. You are running {current}.",
+    "install_now": "Update now",
+    "later": "Later",
+    "open_release": "Open release page",
+    "up_to_date_title": "No updates",
+    "up_to_date_text": "ParqScan {release} is the latest version.",
+    "check_failed": "Could not check for updates: {error}",
+    "downloading": "Downloading update…",
+    "download_failed": "Could not download the update: {error}",
+    "installing": "ParqScan will restart to install the update.",
+    "non_windows_text": "Download the latest release from GitHub to update on this platform."
   }
 }

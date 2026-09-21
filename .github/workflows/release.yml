@@ -1,0 +1,75 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+      - "pre-release-v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows-installer:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -r requirements.txt
+
+      - name: Verify tag matches release metadata
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $expected = $tag -replace '^pre-release-v', '' -replace '^v', ''
+          $release = (Get-Content parqscan/resources/release.json | ConvertFrom-Json).release
+          if ($release -ne $expected) {
+            throw "Tag $tag does not match parqscan/resources/release.json release $release"
+          }
+
+      - name: Install Inno Setup
+        run: choco install innosetup -y
+
+      - name: Build Windows installer
+        env:
+          PARQSCAN_STRICT_BUILD: "1"
+        run: python build.py --installer --skip-smoke-test
+
+      - name: Enforce package size limit
+        shell: pwsh
+        run: |
+          $onedir = "dist/ParqScan"
+          $installer = "dist/installer/ParqScan-Windows-Setup.exe"
+          if (-not (Test-Path $onedir)) {
+            throw "Packaged directory was not created: $onedir"
+          }
+          $onedirBytes = (Get-ChildItem $onedir -Recurse -File | Measure-Object -Property Length -Sum).Sum
+          $onedirMb = [math]::Round($onedirBytes / 1MB, 1)
+          $installerMb = 0
+          if (Test-Path $installer) {
+            $installerMb = [math]::Round((Get-Item $installer).Length / 1MB, 1)
+          }
+          if ($onedirMb -gt 600) {
+            throw "Packaged onedir is ${onedirMb} MB, which exceeds the 600 MB limit."
+          }
+          "ONEDIR_SIZE_MB=$onedirMb" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "INSTALLER_SIZE_MB=$installerMb" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/installer/ParqScan-Windows-Setup.exe
+          generate_release_notes: true
+          append_body: true
+          prerelease: ${{ startsWith(github.ref_name, 'pre-release-') }}
+          body: |
+            Windows installer: ParqScan-Windows-Setup.exe (${{ env.INSTALLER_SIZE_MB }} MB)
+            Packaged onedir size: ${{ env.ONEDIR_SIZE_MB }} MB
