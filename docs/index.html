@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="ParqScan 是跨平台桌面 Parquet 检查器：固定分页读取、按需解码嵌入图片、查看二进制附件并导出常见格式。" />
+    <title>ParqScan — 每次只读一页 Parquet</title>
+    <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;560;650;700;760&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="css/app.css" />
+  </head>
+  <body data-page="home">
+    <a class="skip-link" href="#main" data-i18n="nav.home">首页</a>
+
+    <header class="site-header">
+      <div class="shell site-header__inner">
+        <a class="brand" href="index.html">
+          <img class="brand__mark" src="assets/logo.svg" width="34" height="34" alt="" />
+          <span>ParqScan</span>
+        </a>
+        <nav class="site-nav" aria-label="Primary">
+          <a href="#mechanisms" data-i18n="nav.features">功能</a>
+          <a href="guide.html" data-i18n="nav.guide">使用说明</a>
+          <a href="#" data-repo-link data-i18n="nav.source">源码</a>
+        </nav>
+        <div class="header-controls">
+          <div class="control-group control-group--theme" role="group" aria-label="Theme">
+            <button type="button" data-theme-btn="system" aria-pressed="true" data-i18n="theme.system">跟随系统</button>
+            <button type="button" data-theme-btn="light" aria-pressed="false" data-i18n="theme.light">浅色</button>
+            <button type="button" data-theme-btn="dark" aria-pressed="false" data-i18n="theme.dark">深色</button>
+          </div>
+          <button class="btn btn--ghost" type="button" data-lang-toggle data-i18n="lang.switch">English</button>
+        </div>
+      </div>
+    </header>
+
+    <main id="main" class="shell">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero__copy">
+          <h1 id="hero-title" data-i18n="hero.title">每次只读一页 Parquet</h1>
+          <p data-i18n="hero.lead">ParqScan 不把整份大文件物化进内存。数据预览采用固定分页，模型只保留当前页；翻页时才从磁盘读取下一窗口。</p>
+          <div class="hero__actions">
+            <a class="btn btn--primary" href="guide.html" data-i18n="hero.ctaGuide">开始使用</a>
+            <a class="btn" href="#" data-repo-link data-i18n="hero.ctaSource">查看源码</a>
+          </div>
+        </div>
+
+        <div class="demo-panel" id="demo-panel" aria-labelledby="demo-label">
+          <div class="demo-panel__head">
+            <strong id="demo-label" data-i18n="hero.demoLabel">交互示意（非真实文件）</strong>
+            <div class="demo-page-size" role="group" aria-label="Rows per page" id="demo-page-size">
+              <span data-i18n="hero.pageSize">每页</span>
+              <div class="demo-page-size__options">
+                <button type="button" data-size="20" aria-pressed="true">20</button>
+                <button type="button" data-size="50" aria-pressed="false">50</button>
+                <button type="button" data-size="100" aria-pressed="false">100</button>
+                <button type="button" data-size="200" aria-pressed="false">200</button>
+              </div>
+            </div>
+          </div>
+          <div class="demo-table-wrap">
+            <table class="demo-table">
+              <thead>
+                <tr>
+                  <th scope="col" id="demo-col-id">id</th>
+                  <th scope="col" id="demo-col-image">thumbnail</th>
+                  <th scope="col" id="demo-col-label">label</th>
+                </tr>
+              </thead>
+              <tbody id="demo-tbody"></tbody>
+            </table>
+          </div>
+          <div class="demo-footer">
+            <div class="demo-memory" data-i18n="hero.memoryNote">内存里只有这一页</div>
+            <div class="demo-pagination">
+              <p class="demo-pagination__summary" id="demo-summary" aria-live="polite"></p>
+              <div class="demo-pagination__controls">
+                <button type="button" id="demo-first" class="demo-pagination__nav" aria-label="第一页">«</button>
+                <button type="button" id="demo-prev" class="demo-pagination__nav" aria-label="上一页">‹</button>
+                <span id="demo-page-buttons" class="demo-pagination__pages" role="group" aria-label="Pages"></span>
+                <button type="button" id="demo-next" class="demo-pagination__nav" aria-label="下一页">›</button>
+                <button type="button" id="demo-last" class="demo-pagination__nav" aria-label="最后一页">»</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="split-section" id="mechanisms" aria-labelledby="mechanisms-title">
+        <h2 id="mechanisms-title" data-i18n="mechanisms.title">三个机制</h2>
+        <div class="mechanism-list">
+          <article class="mechanism-item">
+            <h3 data-i18n="mechanisms.paging.title">固定分页读取</h3>
+            <p data-i18n="mechanisms.paging.body">每页 20、50、100 或 200 行可选。翻页、改页大小或关闭文档会释放旧页与缩略图缓存；后台任务用代次隔离，过期结果不能覆盖当前页。</p>
+          </article>
+          <article class="mechanism-item">
+            <h3 data-i18n="mechanisms.images.title">图片按需解码</h3>
+            <p data-i18n="mechanisms.images.body">表格用 72px 缩略图与 520px 悬停预览；完整原图只在打开记录详情时解码。缩放只改视图矩阵，不重复解码。</p>
+          </article>
+          <article class="mechanism-item">
+            <h3 data-i18n="mechanisms.binary.title">嵌套 binary 与 Hex</h3>
+            <p data-i18n="mechanisms.binary.body">递归识别 struct、list、map 中的 binary 叶子。非图片载荷可在详情或右键菜单中打开 Hex + ASCII 搜索，支持按字节、文本或偏移定位。</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="split-section" aria-labelledby="capabilities-title">
+        <h2 id="capabilities-title" data-i18n="capabilities.title">还能做什么</h2>
+        <div class="capability-grid">
+          <article class="capability-card">
+            <h3 data-i18n="capabilities.browse.title">浏览与搜索</h3>
+            <p data-i18n="capabilities.browse.body">元数据、Schema、行组统计；文件级与当前页搜索分离；列可拖动并持久化顺序。</p>
+            <a href="guide.html#browse" data-i18n="capabilities.browse.link">浏览与搜索</a>
+          </article>
+          <article class="capability-card">
+            <h3 data-i18n="capabilities.detail.title">记录详情画布</h3>
+            <p data-i18n="capabilities.detail.body">双击任意单元格打开整行详情；多字段可叠放在自由画布上，图片支持缩放与平移。</p>
+            <a href="guide.html#detail" data-i18n="capabilities.detail.link">记录详情</a>
+          </article>
+          <article class="capability-card">
+            <h3 data-i18n="capabilities.export.title">导出与提取</h3>
+            <p data-i18n="capabilities.export.body">CSV、JSON、Excel、Markdown、SQL、Parquet 碎片；可批量提取嵌入图片。</p>
+            <a href="guide.html#export" data-i18n="capabilities.export.link">导出格式</a>
+          </article>
+        </div>
+      </section>
+
+      <section class="workflow" aria-labelledby="workflow-title">
+        <div>
+          <h2 id="workflow-title" data-i18n="workflow.title">典型路径</h2>
+          <ol id="workflow-steps">
+            <li>打开 Parquet 文件（对话框、拖拽、最近文件或命令行）</li>
+            <li>在元数据页查看 Schema、压缩与行组</li>
+            <li>在数据预览页翻页浏览，必要时搜索或筛选当前页</li>
+            <li>双击行打开详情，或右键查看原始字节</li>
+            <li>导出数据或提取图片</li>
+          </ol>
+        </div>
+        <div class="install-block" id="install">
+          <h2 data-i18n="install.title">快速安装</h2>
+          <p data-i18n="install.body">需要 Python 3 与 requirements.txt 中的依赖（PySide6、PyArrow、openpyxl、psutil）。</p>
+          <pre><code>python -m pip install -r requirements.txt
+python main.py</code></pre>
+          <p data-i18n="install.openFile">打开指定文件：</p>
+          <pre><code>python main.py sample.parquet</code></pre>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="shell site-footer__inner">
+        <p class="site-footer__meta">
+          <span data-version>版本 0.2.5</span>
+          <span class="site-footer__sep" aria-hidden="true">·</span>
+          <a href="https://www.apache.org/licenses/LICENSE-2.0.html" data-license-link rel="noopener noreferrer" target="_blank" data-i18n="footer.license">Apache License 2.0</a>
+          <span class="site-footer__sep" aria-hidden="true">·</span>
+          <a href="#" data-repo-link>GitHub</a>
+        </p>
+      </div>
+    </footer>
+
+    <script src="js/i18n.js"></script>
+    <script src="js/site.js" defer></script>
+  </body>
+</html>

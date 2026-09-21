@@ -1,0 +1,182 @@
+{
+  "meta": {
+    "titleHome": "ParqScan — One Parquet page at a time",
+    "titleGuide": "ParqScan — User guide",
+    "title404": "ParqScan — Page not found",
+    "descriptionHome": "ParqScan is a cross-platform desktop Parquet inspector with explicit paging, on-demand image decode, binary inspection, and common export formats.",
+    "descriptionGuide": "Install, run, and use ParqScan to inspect Parquet files, preview images, and export data."
+  },
+  "nav": {
+    "features": "Features",
+    "guide": "User guide",
+    "source": "Source",
+    "home": "Home"
+  },
+  "theme": {
+    "label": "Theme",
+    "system": "Follow system",
+    "light": "Light",
+    "dark": "Dark"
+  },
+  "lang": {
+    "switch": "中文"
+  },
+  "hero": {
+    "title": "One Parquet page at a time",
+    "lead": "ParqScan never materializes a whole large file into memory. The data view uses fixed paging—the table model keeps only the current page and reads the next window from disk when you turn the page.",
+    "ctaGuide": "Get started",
+    "ctaSource": "View source",
+    "demoLabel": "Interactive demo (not a real file)",
+    "memoryNote": "Only this page is in memory",
+    "pageSize": "Rows per page",
+    "rows": "rows"
+  },
+  "mechanisms": {
+    "title": "Three mechanisms",
+    "paging": {
+      "title": "Fixed paging",
+      "body": "Choose 20, 50, 100, or 200 rows per page. Changing pages or page size releases the previous page and thumbnail cache. Background tasks use generation tokens so stale results cannot overwrite the current page."
+    },
+    "images": {
+      "title": "On-demand image decode",
+      "body": "The table uses 72px thumbnails and 520px hover previews. Full-resolution images decode only when you open record details. Zoom adjusts the view matrix without re-decoding."
+    },
+    "binary": {
+      "title": "Nested binary and Hex",
+      "body": "Recursively finds binary leaves inside struct, list, and map columns. Non-image payloads open in a Hex + ASCII viewer from details or the context menu, searchable by bytes, text, or offset."
+    }
+  },
+  "capabilities": {
+    "title": "What else it does",
+    "browse": {
+      "title": "Browse and search",
+      "body": "Metadata, schema, and row-group stats; separate file-wide and current-page search; draggable columns with persisted order.",
+      "link": "Browse and search"
+    },
+    "detail": {
+      "title": "Record detail canvas",
+      "body": "Double-click any cell to open the full row. Compare multiple fields on a free canvas; images support zoom and pan.",
+      "link": "Record details"
+    },
+    "export": {
+      "title": "Export and extract",
+      "body": "CSV, JSON, Excel, Markdown, SQL, Parquet fragments; batch-extract embedded images.",
+      "link": "Export formats"
+    }
+  },
+  "workflow": {
+    "title": "Typical path",
+    "steps": [
+      "Open a Parquet file (dialog, drag-and-drop, recents, or command line)",
+      "Review schema, compression, and row groups on the metadata tab",
+      "Page through the data preview; search or filter the current page when needed",
+      "Double-click a row for details, or right-click for raw bytes",
+      "Export data or extract images"
+    ]
+  },
+  "install": {
+    "title": "Quick install",
+    "body": "Requires Python 3 and dependencies from requirements.txt (PySide6, PyArrow, openpyxl, psutil).",
+    "openFile": "Open a specific file:"
+  },
+  "footer": {
+    "license": "Apache License 2.0",
+    "version": "Version {release}"
+  },
+  "guide": {
+    "title": "User guide",
+    "intro": "ParqScan is a desktop inspector and converter for Parquet files, embedded images, and binary attachments. This guide mirrors the README and focuses on day-to-day use.",
+    "install": {
+      "title": "Install and run",
+      "body": "After cloning or downloading the repository, install dependencies and start the app from the project root:",
+      "cli": "You can also pass a file path on launch:",
+      "deps": "Main dependencies: PySide6, PyArrow, openpyxl, psutil."
+    },
+    "open": {
+      "title": "Open files",
+      "body": "Use the file menu, drag-and-drop onto the main window, the recent-files list, or a command-line argument. Multiple files can stay open; switch workspaces from the sidebar."
+    },
+    "browse": {
+      "title": "Browse and search",
+      "body": "The data preview uses fixed paging (20 rows by default). Ctrl+F toggles between file-wide search and current-page search—each scope keeps its own state.",
+      "filter": "Current-page filters apply only to visible rows; completing a file search does not clear an active filter. Column-header sort scans the entire file to build a row-index."
+    },
+    "detail": {
+      "title": "Record details",
+      "body": "Single-click selects a row; double-click any cell to open full row details. Multi-select fields on the left; each tile on the canvas can be moved and resized. String JSON is indented in details without changing export semantics."
+    },
+    "images": {
+      "title": "Image preview",
+      "body": "Recognizes JPEG, PNG, BMP, GIF, WEBP, TIFF, ICO, data URIs, and validated Base64—including nested binary fields. Thumbnails in the table, larger hover previews, and full zoom in details."
+    },
+    "binary": {
+      "title": "Raw bytes",
+      "body": "Pick a binary field in details, or right-click a binary cell and choose View raw bytes for Hex + ASCII. Supports auto, Hex byte, text, and offset search modes; click Search to locate matches."
+    },
+    "export": {
+      "title": "Export formats",
+      "body": "Export from the File menu:",
+      "items": [
+        "CSV",
+        "JSON",
+        "Excel",
+        "Markdown",
+        "SQL",
+        "Parquet fragments"
+      ],
+      "note": "You can also batch-extract embedded images to a folder."
+    },
+    "portable": {
+      "title": "Portable configuration",
+      "body": "Settings default to the user app-data directory. Place an empty portable.flag file next to the program to store page size, theme, language, recents, and column order beside the binary."
+    },
+    "packaging": {
+      "title": "Packaging",
+      "body": "Run python build.py for a PyInstaller build. Windows defaults to dist/ParqScan/ParqScan.exe (onedir); use --onefile for a single executable. Check ParqScan/logs/startup.log in app data if startup fails."
+    },
+    "license": {
+      "title": "License",
+      "body": "ParqScan is licensed under the Apache License, Version 2.0. See LICENSE and NOTICE in the repository."
+    },
+    "onPageNav": "On this page"
+  },
+  "notFound": {
+    "title": "Page not found",
+    "body": "The address you requested does not exist. Return home or open the user guide.",
+    "home": "Back to home"
+  },
+  "demo": {
+    "columns": {
+      "id": "id",
+      "image": "thumbnail",
+      "label": "label"
+    },
+    "pages": [
+      [
+        { "id": 1, "hue": 210, "label": "row_group_0" },
+        { "id": 2, "hue": 165, "label": "embedded_png" },
+        { "id": 3, "hue": 42, "label": "metadata" }
+      ],
+      [
+        { "id": 21, "hue": 280, "label": "batch_a" },
+        { "id": 22, "hue": 12, "label": "batch_b" },
+        { "id": 23, "hue": 195, "label": "nulls=0" }
+      ],
+      [
+        { "id": 41, "hue": 95, "label": "struct.bytes" },
+        { "id": 42, "hue": 330, "label": "base64_img" },
+        { "id": 43, "hue": 55, "label": "checksum" }
+      ],
+      [
+        { "id": 61, "hue": 225, "label": "tail_rows" },
+        { "id": 62, "hue": 145, "label": "last_page" },
+        { "id": 63, "hue": 18, "label": "eof" }
+      ]
+    ],
+    "pageSummary": "Page {page} / {total}",
+    "first": "First",
+    "prev": "Previous",
+    "next": "Next",
+    "last": "Last"
+  }
+}

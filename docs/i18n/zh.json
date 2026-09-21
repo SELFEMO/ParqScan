@@ -1,0 +1,182 @@
+{
+  "meta": {
+    "titleHome": "ParqScan — 每次只读一页 Parquet",
+    "titleGuide": "ParqScan — 使用说明",
+    "title404": "ParqScan — 页面未找到",
+    "descriptionHome": "ParqScan 是跨平台桌面 Parquet 检查器：固定分页读取、按需解码嵌入图片、查看二进制附件并导出常见格式。",
+    "descriptionGuide": "安装、运行与使用 ParqScan 检查 Parquet 文件、预览图片与导出数据。"
+  },
+  "nav": {
+    "features": "功能",
+    "guide": "使用说明",
+    "source": "源码",
+    "home": "首页"
+  },
+  "theme": {
+    "label": "主题",
+    "system": "跟随系统",
+    "light": "浅色",
+    "dark": "深色"
+  },
+  "lang": {
+    "switch": "English"
+  },
+  "hero": {
+    "title": "每次只读一页 Parquet",
+    "lead": "ParqScan 不把整份大文件物化进内存。数据预览采用固定分页，模型只保留当前页；翻页时才从磁盘读取下一窗口。",
+    "ctaGuide": "开始使用",
+    "ctaSource": "查看源码",
+    "demoLabel": "交互示意（非真实文件）",
+    "memoryNote": "内存里只有这一页",
+    "pageSize": "每页",
+    "rows": "行"
+  },
+  "mechanisms": {
+    "title": "三个机制",
+    "paging": {
+      "title": "固定分页读取",
+      "body": "每页 20、50、100 或 200 行可选。翻页、改页大小或关闭文档会释放旧页与缩略图缓存；后台任务用代次隔离，过期结果不能覆盖当前页。"
+    },
+    "images": {
+      "title": "图片按需解码",
+      "body": "表格用 72px 缩略图与 520px 悬停预览；完整原图只在打开记录详情时解码。缩放只改视图矩阵，不重复解码。"
+    },
+    "binary": {
+      "title": "嵌套 binary 与 Hex",
+      "body": "递归识别 struct、list、map 中的 binary 叶子。非图片载荷可在详情或右键菜单中打开 Hex + ASCII 搜索，支持按字节、文本或偏移定位。"
+    }
+  },
+  "capabilities": {
+    "title": "还能做什么",
+    "browse": {
+      "title": "浏览与搜索",
+      "body": "元数据、Schema、行组统计；文件级与当前页搜索分离；列可拖动并持久化顺序。",
+      "link": "浏览与搜索"
+    },
+    "detail": {
+      "title": "记录详情画布",
+      "body": "双击任意单元格打开整行详情；多字段可叠放在自由画布上，图片支持缩放与平移。",
+      "link": "记录详情"
+    },
+    "export": {
+      "title": "导出与提取",
+      "body": "CSV、JSON、Excel、Markdown、SQL、Parquet 碎片；可批量提取嵌入图片。",
+      "link": "导出格式"
+    }
+  },
+  "workflow": {
+    "title": "典型路径",
+    "steps": [
+      "打开 Parquet 文件（对话框、拖拽、最近文件或命令行）",
+      "在元数据页查看 Schema、压缩与行组",
+      "在数据预览页翻页浏览，必要时搜索或筛选当前页",
+      "双击行打开详情，或右键查看原始字节",
+      "导出数据或提取图片"
+    ]
+  },
+  "install": {
+    "title": "快速安装",
+    "body": "需要 Python 3 与 requirements.txt 中的依赖（PySide6、PyArrow、openpyxl、psutil）。",
+    "openFile": "打开指定文件："
+  },
+  "footer": {
+    "license": "Apache License 2.0",
+    "version": "版本 {release}"
+  },
+  "guide": {
+    "title": "使用说明",
+    "intro": "ParqScan 是面向 Parquet、嵌入图片和二进制附件的桌面检查与转换工具。以下说明与 README 一致，侧重日常操作。",
+    "install": {
+      "title": "安装与运行",
+      "body": "克隆或下载仓库后，在项目根目录安装依赖并启动：",
+      "cli": "也可在启动时传入文件路径：",
+      "deps": "主要依赖：PySide6、PyArrow、openpyxl、psutil。"
+    },
+    "open": {
+      "title": "打开文件",
+      "body": "支持文件菜单、拖拽到主窗口、最近文件列表，以及命令行参数。可同时打开多个文件，在侧栏切换工作区。"
+    },
+    "browse": {
+      "title": "浏览与搜索",
+      "body": "数据预览使用固定分页，默认每页 20 行。Ctrl+F 可在「文件级搜索」与「当前页搜索」之间切换——两者状态独立，不会互相覆盖。",
+      "filter": "当前页筛选只作用于可见行；文件搜索完成后不会自动清除筛选。列头排序会扫描整个文件建立行号索引。"
+    },
+    "detail": {
+      "title": "记录详情",
+      "body": "单击选中整行；双击任意单元格打开该行的完整详情。左侧多选字段，右侧画布按格显示；新格叠在 (0,0) 并置顶。字符串 JSON 在详情中按层级缩进显示，不改变导出语义。"
+    },
+    "images": {
+      "title": "图片预览",
+      "body": "识别 JPEG、PNG、BMP、GIF、WEBP、TIFF、ICO、data URI 与校验过的 Base64，包括嵌套 binary 字段。表格显示缩略图；悬停显示较大预览；详情中可缩放查看完整原图。"
+    },
+    "binary": {
+      "title": "原始字节",
+      "body": "在详情中选择二进制字段，或在数据表右键「查看原始字节」，打开 Hex + ASCII 视图。支持自动、Hex 字节、文本与偏移地址搜索；需点击「搜索」按钮执行定位。"
+    },
+    "export": {
+      "title": "导出格式",
+      "body": "通过文件菜单导出：",
+      "items": [
+        "CSV",
+        "JSON",
+        "Excel",
+        "Markdown",
+        "SQL",
+        "Parquet 碎片"
+      ],
+      "note": "另可批量提取当前文件中的嵌入图片到指定目录。"
+    },
+    "portable": {
+      "title": "可移植配置",
+      "body": "默认配置保存在用户应用数据目录。在程序目录放置空文件 portable.flag 后，分页大小、主题、语言、最近文件与列顺序会保存在程序目录旁。"
+    },
+    "packaging": {
+      "title": "打包",
+      "body": "运行 python build.py 生成 PyInstaller 产物。Windows 默认为 dist/ParqScan/ParqScan.exe 目录模式；单文件使用 --onefile。启动失败可查看用户应用数据目录 ParqScan/logs/startup.log。"
+    },
+    "license": {
+      "title": "许可证",
+      "body": "ParqScan 按 Apache License 2.0 授权。详见仓库中的 LICENSE 与 NOTICE 文件。"
+    },
+    "onPageNav": "本页目录"
+  },
+  "notFound": {
+    "title": "页面未找到",
+    "body": "你访问的地址不存在。请返回首页或打开使用说明。",
+    "home": "返回首页"
+  },
+  "demo": {
+    "columns": {
+      "id": "id",
+      "image": "thumbnail",
+      "label": "label"
+    },
+    "pages": [
+      [
+        { "id": 1, "hue": 210, "label": "row_group_0" },
+        { "id": 2, "hue": 165, "label": "embedded_png" },
+        { "id": 3, "hue": 42, "label": "metadata" }
+      ],
+      [
+        { "id": 21, "hue": 280, "label": "batch_a" },
+        { "id": 22, "hue": 12, "label": "batch_b" },
+        { "id": 23, "hue": 195, "label": "nulls=0" }
+      ],
+      [
+        { "id": 41, "hue": 95, "label": "struct.bytes" },
+        { "id": 42, "hue": 330, "label": "base64_img" },
+        { "id": 43, "hue": 55, "label": "checksum" }
+      ],
+      [
+        { "id": 61, "hue": 225, "label": "tail_rows" },
+        { "id": 62, "hue": 145, "label": "last_page" },
+        { "id": 63, "hue": 18, "label": "eof" }
+      ]
+    ],
+    "pageSummary": "第 {page} / {total} 页",
+    "first": "第一页",
+    "prev": "上一页",
+    "next": "下一页",
+    "last": "最后一页"
+  }
+}

@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="安装、运行与使用 ParqScan 检查 Parquet 文件、预览图片与导出数据。" />
+    <title>ParqScan — 使用说明</title>
+    <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;560;650;700;760&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="css/app.css" />
+  </head>
+  <body data-page="guide">
+    <a class="skip-link" href="#main" data-i18n="nav.guide">使用说明</a>
+
+    <header class="site-header">
+      <div class="shell site-header__inner">
+        <a class="brand" href="index.html">
+          <img class="brand__mark" src="assets/logo.svg" width="34" height="34" alt="" />
+          <span>ParqScan</span>
+        </a>
+        <nav class="site-nav" aria-label="Primary">
+          <a href="index.html#mechanisms" data-i18n="nav.features">功能</a>
+          <a href="guide.html" aria-current="page" data-i18n="nav.guide">使用说明</a>
+          <a href="#" data-repo-link data-i18n="nav.source">源码</a>
+        </nav>
+        <div class="header-controls">
+          <div class="control-group control-group--theme" role="group" aria-label="Theme">
+            <button type="button" data-theme-btn="system" aria-pressed="true" data-i18n="theme.system">跟随系统</button>
+            <button type="button" data-theme-btn="light" aria-pressed="false" data-i18n="theme.light">浅色</button>
+            <button type="button" data-theme-btn="dark" aria-pressed="false" data-i18n="theme.dark">深色</button>
+          </div>
+          <button class="btn btn--ghost" type="button" data-lang-toggle data-i18n="lang.switch">English</button>
+        </div>
+      </div>
+    </header>
+
+    <main id="main" class="shell guide-layout">
+      <aside class="guide-nav" aria-labelledby="guide-nav-title">
+        <h2 id="guide-nav-title" data-i18n="guide.onPageNav">本页目录</h2>
+        <ul>
+          <li><a href="#install" data-i18n="guide.install.title">安装与运行</a></li>
+          <li><a href="#open" data-i18n="guide.open.title">打开文件</a></li>
+          <li><a href="#browse" data-i18n="guide.browse.title">浏览与搜索</a></li>
+          <li><a href="#detail" data-i18n="guide.detail.title">记录详情</a></li>
+          <li><a href="#images" data-i18n="guide.images.title">图片预览</a></li>
+          <li><a href="#binary" data-i18n="guide.binary.title">原始字节</a></li>
+          <li><a href="#export" data-i18n="guide.export.title">导出格式</a></li>
+          <li><a href="#portable" data-i18n="guide.portable.title">可移植配置</a></li>
+          <li><a href="#packaging" data-i18n="guide.packaging.title">打包</a></li>
+          <li><a href="#license" data-i18n="guide.license.title">许可证</a></li>
+        </ul>
+      </aside>
+
+      <article class="guide-content">
+        <h1 data-i18n="guide.title">使用说明</h1>
+        <p class="lead" data-i18n="guide.intro">ParqScan 是面向 Parquet、嵌入图片和二进制附件的桌面检查与转换工具。以下说明与 README 一致，侧重日常操作。</p>
+
+        <section class="guide-section" id="install">
+          <h2 data-i18n="guide.install.title">安装与运行</h2>
+          <p data-i18n="guide.install.body">克隆或下载仓库后，在项目根目录安装依赖并启动：</p>
+          <pre><code>python -m pip install -r requirements.txt
+python main.py</code></pre>
+          <p data-i18n="guide.install.cli">也可在启动时传入文件路径：</p>
+          <pre><code>python main.py sample.parquet</code></pre>
+          <p data-i18n="guide.install.deps">主要依赖：PySide6、PyArrow、openpyxl、psutil。</p>
+        </section>
+
+        <section class="guide-section" id="open">
+          <h2 data-i18n="guide.open.title">打开文件</h2>
+          <p data-i18n="guide.open.body">支持文件菜单、拖拽到主窗口、最近文件列表，以及命令行参数。可同时打开多个文件，在侧栏切换工作区。</p>
+        </section>
+
+        <section class="guide-section" id="browse">
+          <h2 data-i18n="guide.browse.title">浏览与搜索</h2>
+          <p data-i18n="guide.browse.body">数据预览使用固定分页，默认每页 20 行。Ctrl+F 可在「文件级搜索」与「当前页搜索」之间切换——两者状态独立，不会互相覆盖。</p>
+          <p data-i18n="guide.browse.filter">当前页筛选只作用于可见行；文件搜索完成后不会自动清除筛选。列头排序会扫描整个文件建立行号索引。</p>
+        </section>
+
+        <section class="guide-section" id="detail">
+          <h2 data-i18n="guide.detail.title">记录详情</h2>
+          <p data-i18n="guide.detail.body">单击选中整行；双击任意单元格打开该行的完整详情。左侧多选字段，右侧画布按格显示；新格叠在 (0,0) 并置顶。字符串 JSON 在详情中按层级缩进显示，不改变导出语义。</p>
+        </section>
+
+        <section class="guide-section" id="images">
+          <h2 data-i18n="guide.images.title">图片预览</h2>
+          <p data-i18n="guide.images.body">识别 JPEG、PNG、BMP、GIF、WEBP、TIFF、ICO、data URI 与校验过的 Base64，包括嵌套 binary 字段。表格显示缩略图；悬停显示较大预览；详情中可缩放查看完整原图。</p>
+        </section>
+
+        <section class="guide-section" id="binary">
+          <h2 data-i18n="guide.binary.title">原始字节</h2>
+          <p data-i18n="guide.binary.body">在详情中选择二进制字段，或在数据表右键「查看原始字节」，打开 Hex + ASCII 视图。支持自动、Hex 字节、文本与偏移地址搜索；需点击「搜索」按钮执行定位。</p>
+        </section>
+
+        <section class="guide-section" id="export">
+          <h2 data-i18n="guide.export.title">导出格式</h2>
+          <p data-i18n="guide.export.body">通过文件菜单导出：</p>
+          <ul id="export-formats">
+            <li>CSV</li>
+            <li>JSON</li>
+            <li>Excel</li>
+            <li>Markdown</li>
+            <li>SQL</li>
+            <li>Parquet 碎片</li>
+            <li>另可批量提取当前文件中的嵌入图片到指定目录。</li>
+          </ul>
+        </section>
+
+        <section class="guide-section" id="portable">
+          <h2 data-i18n="guide.portable.title">可移植配置</h2>
+          <p data-i18n="guide.portable.body">默认配置保存在用户应用数据目录。在程序目录放置空文件 portable.flag 后，分页大小、主题、语言、最近文件与列顺序会保存在程序目录旁。</p>
+          <pre><code>portable.flag</code></pre>
+        </section>
+
+        <section class="guide-section" id="packaging">
+          <h2 data-i18n="guide.packaging.title">打包</h2>
+          <p data-i18n="guide.packaging.body">运行 python build.py 生成 PyInstaller 产物。Windows 默认为 dist/ParqScan/ParqScan.exe 目录模式；单文件使用 --onefile。启动失败可查看用户应用数据目录 ParqScan/logs/startup.log。</p>
+          <pre><code>python build.py
+python build.py --onefile</code></pre>
+        </section>
+
+        <section class="guide-section" id="license">
+          <h2 data-i18n="guide.license.title">许可证</h2>
+          <p data-i18n="guide.license.body">ParqScan 按 Apache License 2.0 授权。详见仓库中的 LICENSE 与 NOTICE 文件。</p>
+        </section>
+      </article>
+    </main>
+
+    <footer class="site-footer">
+      <div class="shell site-footer__inner">
+        <p class="site-footer__meta">
+          <span data-version>版本 0.2.5</span>
+          <span class="site-footer__sep" aria-hidden="true">·</span>
+          <a href="https://www.apache.org/licenses/LICENSE-2.0.html" data-license-link rel="noopener noreferrer" target="_blank" data-i18n="footer.license">Apache License 2.0</a>
+          <span class="site-footer__sep" aria-hidden="true">·</span>
+          <a href="index.html" data-i18n="nav.home">首页</a>
+        </p>
+      </div>
+    </footer>
+
+    <script src="js/i18n.js"></script>
+    <script src="js/site.js" defer></script>
+  </body>
+</html>

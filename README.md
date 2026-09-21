@@ -64,8 +64,23 @@ Windows 默认目录模式，产物为 `dist/ParqScan/ParqScan.exe`。需要单�
 
 ## 文档
 
+- [GitHub Pages 站点](docs/index.html)：产品首页与使用说明（静态文件位于 `docs/`，启用后访问 `https://<user>.github.io/ParqScan/`）。
 - [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md)：架构、模块职责与行为边界。
 - [PROJECT_RECORD.md](PROJECT_RECORD.md)：按日期的重要变更记录。
+
+### 启用 GitHub Pages
+
+1. 打开仓库 **Settings → Pages**。
+2. **Build and deployment → Source** 选择 **Deploy from a branch**。
+3. **Branch** 选择默认分支（通常为 `main`），**Folder** 选择 **`/docs`**，保存。
+4. 等待部署完成后，站点地址为 `https://<github-username>.github.io/ParqScan/`（本仓库用户名为 `SELFEMO` 时即 `https://selfemo.github.io/ParqScan/`）。
+
+本地预览：
+
+- 可直接双击打开 `docs/index.html` 或 `docs/guide.html`（文案内嵌在 `docs/js/i18n.js`，不依赖本地服务器）。
+- 若需模拟 GitHub Pages 路径，可运行 `python -m http.server 8080 --directory docs`，然后打开 `http://localhost:8080/`。
+
+修改文案时，请同步更新 `docs/i18n/zh.json`、`docs/i18n/en.json`，并重新生成 `docs/js/i18n.js`（两者需保持一致）。
 
 ## License
 

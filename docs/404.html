@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>ParqScan — 页面未找到</title>
+    <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;560;650;700;760&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="css/app.css" />
+  </head>
+  <body data-page="404">
+    <header class="site-header">
+      <div class="shell site-header__inner">
+        <a class="brand" href="index.html">
+          <img class="brand__mark" src="assets/logo.svg" width="34" height="34" alt="" />
+          <span>ParqScan</span>
+        </a>
+        <div class="header-controls">
+          <div class="control-group control-group--theme" role="group" aria-label="Theme">
+            <button type="button" data-theme-btn="system" aria-pressed="true" data-i18n="theme.system">跟随系统</button>
+            <button type="button" data-theme-btn="light" aria-pressed="false" data-i18n="theme.light">浅色</button>
+            <button type="button" data-theme-btn="dark" aria-pressed="false" data-i18n="theme.dark">深色</button>
+          </div>
+          <button class="btn btn--ghost" type="button" data-lang-toggle data-i18n="lang.switch">English</button>
+        </div>
+      </div>
+    </header>
+
+    <main id="main" class="shell not-found">
+      <h1 data-i18n="notFound.title">页面未找到</h1>
+      <p data-i18n="notFound.body">你访问的地址不存在。请返回首页或打开使用说明。</p>
+      <div class="hero__actions" style="justify-content: center">
+        <a class="btn btn--primary" href="index.html" data-i18n="notFound.home">返回首页</a>
+        <a class="btn" href="guide.html" data-i18n="nav.guide">使用说明</a>
+      </div>
+    </main>
+
+    <script src="js/i18n.js"></script>
+    <script src="js/site.js" defer></script>
+  </body>
+</html>
