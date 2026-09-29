@@ -37,7 +37,7 @@ Windows 用户推荐直接安装 [最新 Release 中的 `ParqScan-Windows-Setup.
 
 ## 安装与运行
 
-需要 Python 3，以及 [requirements.txt](requirements.txt) 中的依赖（PySide6、PyArrow、openpyxl、psutil）。
+需要 Python 3 （最好是 Python 3.12+），以及 [requirements.txt](requirements.txt) 中的依赖（PySide6、PyArrow、openpyxl、psutil）。
 
 ```bash
 python -m pip install -r requirements.txt
