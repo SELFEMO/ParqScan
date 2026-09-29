@@ -40,6 +40,10 @@ Windows 用户推荐直接安装 [最新 Release 中的 `ParqScan-Windows-Setup.
 需要 Python 3 （最好是 Python 3.12+），以及 [requirements.txt](requirements.txt) 中的依赖（PySide6、PyArrow、openpyxl、psutil）。
 
 ```bash
+# conda init *
+conda create --name py312 python=3.12 -y
+conda activate py312
+
 python -m pip install -r requirements.txt
 python main.py
 ```
