@@ -234,6 +234,7 @@
     "downloading": "正在下载更新…",
     "download_failed": "下载更新失败：{error}",
     "installing": "即将重启并安装更新。",
-    "non_windows_text": "请从 GitHub Release 页面下载最新版本以完成更新。"
+    "installing_macos": "更新镜像已下载，即将打开 DMG 并退出 ParqScan，请将应用拖入 Applications 完成替换。",
+    "non_windows_text": "请从 GitHub Release 页面下载适用于当前系统的安装包以完成更新。"
   }
 }

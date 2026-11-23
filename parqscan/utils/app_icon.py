@@ -18,6 +18,12 @@ def _icon_candidate_paths() -> list[Path]:
             resources / "ParqScan.png",
             resources / "ParqScan.svg",
         ]
+    if sys.platform == "darwin":
+        return [
+            resources / "ParqScan.icns",
+            resources / "ParqScan.png",
+            resources / "ParqScan.svg",
+        ]
     return [
         resources / "ParqScan.svg",
         resources / "ParqScan.png",

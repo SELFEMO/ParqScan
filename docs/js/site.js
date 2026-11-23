@@ -13,6 +13,9 @@
     licenseUrl: "https://www.apache.org/licenses/LICENSE-2.0.html",
     releaseApiUrl: "https://api.github.com/repos/SELFEMO/ParqScan/releases/latest",
     windowsAssetName: "ParqScan-Windows-Setup.exe",
+    macosArm64AssetName: "ParqScan-macOS-arm64.dmg",
+    linuxDebAssetName: "ParqScan-Linux-amd64.deb",
+    linuxRpmAssetName: "ParqScan-Linux-x86_64.rpm",
     releaseDownloadUrl: "",
     demoPage: 0,
     demoPageSize: 20,
@@ -126,8 +129,17 @@
     }
   }
 
+  function currentPlatformAssetName() {
+    const releaseApi = window.ParqScanRelease;
+    if (releaseApi && typeof releaseApi.preferredAssetName === "function") {
+      return releaseApi.preferredAssetName(state, navigator.userAgent, navigator.platform);
+    }
+    return state.windowsAssetName;
+  }
+
   function applyReleaseLinks() {
-    const fallback = window.ParqScanRelease?.latestDownloadUrl(state.repoUrl, state.windowsAssetName) || "";
+    const assetName = currentPlatformAssetName();
+    const fallback = window.ParqScanRelease?.latestDownloadUrl(state.repoUrl, assetName) || "";
     const downloadUrl = state.releaseDownloadUrl || fallback;
 
     document.querySelectorAll("[data-release-download]").forEach((el) => {
@@ -157,7 +169,10 @@
       if (normalized) {
         state.release = normalized;
       }
-      const assetUrl = releaseApi.findAssetUrl(payload.assets, state.windowsAssetName);
+      const preferred = currentPlatformAssetName();
+      const assetUrl =
+        releaseApi.findAssetUrl(payload.assets, preferred) ||
+        releaseApi.findAssetUrl(payload.assets, state.windowsAssetName);
       if (assetUrl) {
         state.releaseDownloadUrl = assetUrl;
       }
@@ -378,6 +393,9 @@
           licenseUrl: state.licenseUrl,
           releaseApiUrl: state.releaseApiUrl,
           windowsAssetName: state.windowsAssetName,
+          macosArm64AssetName: state.macosArm64AssetName,
+          linuxDebAssetName: state.linuxDebAssetName,
+          linuxRpmAssetName: state.linuxRpmAssetName,
         })),
       ]);
       state.release = version.release || state.release;
@@ -385,6 +403,9 @@
       state.licenseUrl = site.licenseUrl || state.licenseUrl;
       state.releaseApiUrl = site.releaseApiUrl || state.releaseApiUrl;
       state.windowsAssetName = site.windowsAssetName || state.windowsAssetName;
+      state.macosArm64AssetName = site.macosArm64AssetName || state.macosArm64AssetName;
+      state.linuxDebAssetName = site.linuxDebAssetName || state.linuxDebAssetName;
+      state.linuxRpmAssetName = site.linuxRpmAssetName || state.linuxRpmAssetName;
       await loadLatestRelease();
     } catch (_error) {
       /* keep defaults */

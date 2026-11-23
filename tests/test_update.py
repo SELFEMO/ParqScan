@@ -94,6 +94,38 @@ class UpdateControllerTests(unittest.TestCase):
         config.data = config._load()
         return UpdateController(config), config_path
 
+    def test_platform_asset_name_resolves_per_os(self) -> None:
+        from parqscan.update.constants import (
+            LINUX_DEB_AMD64_ASSET_NAME,
+            LINUX_RPM_X86_64_ASSET_NAME,
+            MACOS_ARM64_ASSET_NAME,
+            WINDOWS_ASSET_NAME,
+            platform_asset_name,
+        )
+
+        self.assertEqual(platform_asset_name("win32", "AMD64"), WINDOWS_ASSET_NAME)
+        self.assertEqual(platform_asset_name("darwin", "arm64"), MACOS_ARM64_ASSET_NAME)
+        self.assertEqual(platform_asset_name("linux", "x86_64", "deb"), LINUX_DEB_AMD64_ASSET_NAME)
+        self.assertEqual(platform_asset_name("linux", "x86_64", "rpm"), LINUX_RPM_X86_64_ASSET_NAME)
+
+    def test_can_install_in_place_supports_windows_and_macos(self) -> None:
+        import sys
+
+        with patch.object(sys, "platform", "win32"):
+            self.assertTrue(UpdateController.can_install_in_place())
+        with patch.object(sys, "platform", "darwin"):
+            self.assertTrue(UpdateController.can_install_in_place())
+        with patch.object(sys, "platform", "linux"):
+            self.assertFalse(UpdateController.can_install_in_place())
+
+    def test_launch_installer_opens_dmg_on_macos(self) -> None:
+        import sys
+
+        with patch.object(sys, "platform", "darwin"):
+            with patch("parqscan.update.controller.subprocess.Popen") as popen:
+                UpdateController.launch_installer("/tmp/ParqScan.dmg")
+        popen.assert_called_once_with(["open", "/tmp/ParqScan.dmg"], close_fds=True)
+
     def test_should_auto_check_respects_interval(self) -> None:
         recent = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
         controller, _path = self._make_controller({"auto_check_updates": True, "last_update_check": recent})

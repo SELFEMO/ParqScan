@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=ParqScan
+GenericName=Parquet File Inspector
+Comment=Desktop inspector and converter for Parquet files, embedded images, and binary attachments
+Comment[zh_CN]=面向 Parquet、嵌入图片和二进制附件的桌面检查与转换工具
+Exec=/opt/parqscan/ParqScan %F
+Icon=parqscan
+Terminal=false
+Categories=Development;Utility;DataVisualization;
+MimeType=application/vnd.apache.parquet;application/x-parquet;
+StartupNotify=true
+StartupWMClass=ParqScan

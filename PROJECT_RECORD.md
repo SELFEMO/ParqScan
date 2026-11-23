@@ -2,6 +2,31 @@
 
 按日期记录重要修改及原因。同一天内相关改动已合并，更早条目保持原顺序。
 
+## 2026-11-23 — macOS Apple Silicon (`.dmg`) 与 Linux (`.deb` / `.rpm`) 跨平台适配
+
+### 修改内容
+
+- **打包规范与图标资源**：
+  - 生成多分辨率 macOS 原生图标 `parqscan/resources/ParqScan.icns`；`parqscan/utils/app_icon.py` 在 macOS 优先加载 `.icns` → `.png` → `.svg`。
+  - 升级 `ParqScan.spec`：macOS `BUNDLE` 绑定 `ParqScan.icns`、固定 Apple Silicon `arm64` 目标架构、注入完整 `Info.plist`（版本、`NSHighResolutionCapable`、`LSMinimumSystemVersion: 12.0` 与 `.parquet`/`.parq`/`.pq` 的 `CFBundleDocumentTypes`）；按平台显式收集 Qt `platforms`/`styles`/`platformthemes` 插件；Linux GUI 默认 `console=BUILD_DEBUG`。
+  - 新增 `packaging/linux/parqscan.desktop`、`packaging/linux/parqscan-mime.xml` 与 `packaging/linux/parqscan.spec.in`，提供 Linux 桌面菜单入口、MIME 文件关联与 RPM 规范模板。
+- **跨平台构建与安装包流水线**：
+  - 升级 `build.py`：全平台默认使用 `onedir`（Linux 安装到 `/opt/parqscan` 避免 `onefile` 冷启动解压）；`validate_packaged_size()` 正确计量 macOS `ParqScan.app`；新增 `--package-format`（`auto`/`exe`/`dmg`/`deb`/`rpm`/`all`）并实现 `build_macos_dmg()`（`codesign` + `hdiutil`）、`build_linux_deb()`（`dpkg-deb`）与 `build_linux_rpm()`（`rpmbuild`）。
+  - 新增 `scripts/build_macos.sh` 与 `scripts/build_linux.sh` 干净虚拟环境一键构建脚本。
+- **桌面运行时与自动更新适配**：
+  - `parqscan/application.py` 新增 `ParqScanApplication` 拦截 macOS Finder/Dock 的 `QFileOpenEvent`（支持启动前缓存队列），并在 Linux 设置 `setDesktopFileName("parqscan")`。
+  - `main.py` 为 macOS（`osascript`）与 Linux（`zenity`/`kdialog`）补齐 Qt 加载前启动崩溃的原生弹窗反馈。
+  - `parqscan/main_window.py` 在 macOS 顶部菜单栏使用原生 `QMenu` 并配置 `AboutRole`/`QuitRole`，使用跨平台标准快捷键（`FindNext`/`FindPrevious` 与 macOS `Cmd+1/2`），并修复 `retranslate()` 无条件禁用关闭/导出菜单的缺陷。
+  - `parqscan/update/` 扩展多平台资产解析（Windows `.exe`、macOS `arm64`/`x86_64` `.dmg`、Linux `amd64`/`arm64` `.deb` 与 `x86_64`/`aarch64` `.rpm`），macOS 支持自动下载并挂载打开 `.dmg`，同步补齐中英文提示文案。
+- **CI/CD、官网与回归测试**：
+  - `.github/workflows/release.yml` 升级为 `windows-latest` + `macos-14` + `ubuntu-latest` 三平台构建矩阵，统一汇聚发布至 GitHub Release。
+  - `docs/site.json`、`docs/js/release.js` 与 `docs/js/site.js` 支持按访问者操作系统自动匹配对应平台安装包链接。
+  - 扩展 `tests/test_build.py`、`tests/test_update.py`、`tests/test_app_icon.py` 与 `tests/test_docs_site.py`。
+
+### 设计原因
+
+此前构建与分发链路仅完整覆盖 Windows Inno Setup，macOS 缺少 `.icns`、`Info.plist` 文件关联、原生菜单栏适配与 `.dmg` 流水线，Linux 也缺少标准 `.deb`/`.rpm` 系统包与桌面/MIME 集成。本次改造在保持现有 Windows 行为与分页低内存核心架构不变的前提下，一次性打通三平台构建、运行体验、自动更新与 CI 发布闭环。
+
 ## 2026-11-23 — v0.3.6：检查更新并发链路修复与单弹窗统一
 
 ### 修改内容

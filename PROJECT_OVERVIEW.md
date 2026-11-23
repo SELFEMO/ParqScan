@@ -62,9 +62,11 @@ ParqScan 使用 Python、PySide6 与 PyArrow，在不把完整大文件物化到
 
 顶层菜单与下拉必须用蒙版裁切圆角（QSS `border-radius` 不够）。`RoundedMenu`、`RoundedComboBox`、`RoundedTableView`、`MessageDialog`、`SearchField`、`PaginationBar` 承担真实裁切、无原生长 Tooltip、图标分页。
 
-### 6. 检查更新
+### 6. 检查更新与跨平台分发
 
-`UpdateController` 持有后台检查与下载 Worker 的强引用，通过三参数 `Signal(object, bool, int)` 直连主线程 `@Slot`（`QueuedConnection`），并结合代次编号与 10 秒请求超时避免线程卡死；主窗口复用唯一可取消的进度框，避免自动检查与手动触发弹出双窗口。
+`UpdateController` 持有后台检查与下载 Worker 的强引用，通过三参数 `Signal(object, bool, int)` 直连主线程 `@Slot`（`QueuedConnection`），并结合代次编号与 10 秒请求超时避免线程卡死；主窗口复用唯一可取消的进度框。更新器按当前操作系统与架构自动匹配 GitHub Release 资产（Windows `.exe`、macOS `.dmg`、Linux `.deb`/`.rpm`），Windows 支持静默安装，macOS 支持下载并自动挂载打开 `.dmg`，Linux 引导前往 Release 页面下载对应系统包。
+
+打包与分发统一由 `ParqScan.spec` 与 `build.py --installer` 驱动：Windows 生成 Inno Setup 安装包，macOS Apple Silicon 生成包含 `Info.plist` 与 `.parquet`/`.parq`/`.pq` 文件关联的 `.app` 与 `.dmg`，Linux 生成安装至 `/opt/parqscan` 并注册 `.desktop`/MIME 的 `.deb` 与 `.rpm`。
 
 ## 三、目录与文件职责
 
@@ -73,8 +75,10 @@ ParqScan 使用 Python、PySide6 与 PyArrow，在不把完整大文件物化到
 | 文件 | 职责 |
 | --- | --- |
 | `main.py` | 入口；冻结程序启动诊断；`--smoke-test` |
-| `build.py` | PyInstaller 构建与冒烟测试 |
-| `ParqScan.spec` | 冻结配置的唯一来源 |
+| `build.py` | PyInstaller 构建、体积门禁、冒烟测试与三平台安装包生成（`.exe`/`.dmg`/`.deb`/`.rpm`） |
+| `ParqScan.spec` | 三平台冻结配置的唯一来源（含 macOS `Info.plist` 与跨平台 Qt 插件收集） |
+| `packaging/` | Windows Inno Setup（`inno/`）与 Linux 桌面/MIME/RPM 模板（`linux/`） |
+| `scripts/` | `build_windows.ps1`、`build_macos.sh`、`build_linux.sh` 与元数据同步脚本 |
 | `requirements.txt` | PySide6、PyArrow、openpyxl、psutil |
 | `LICENSE` / `NOTICE` | Apache 2.0 |
 | `README.md` | 使用说明 |
@@ -83,7 +87,7 @@ ParqScan 使用 Python、PySide6 与 PyArrow，在不把完整大文件物化到
 
 ### 应用与配置
 
-- `parqscan/application.py`：生命周期、命令行路径、Windows AppId。
+- `parqscan/application.py`：`ParqScanApplication` 生命周期、命令行路径、macOS `FileOpen` 事件与 Linux `desktopFileName`。
 - `parqscan/config.py`：便携或用户目录 JSON 配置。
 - `parqscan/constants.py`：分页、缩略图 / 悬停尺寸、行高、导出批次。
 - `parqscan/i18n.py` / `themes.py` / `tokens.py`：中英文（含英文回退）、浅色 / 深色语义 Token 源与 `QPalette`/`theme_changed` 主题总线。

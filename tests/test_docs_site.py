@@ -104,6 +104,9 @@ class DocsSiteTests(unittest.TestCase):
         self.assertTrue(site.get("licenseUrl", "").startswith("https://www.apache.org/licenses/"))
         self.assertIn("/releases/latest", site.get("releaseApiUrl", ""))
         self.assertEqual(site.get("windowsAssetName"), "ParqScan-Windows-Setup.exe")
+        self.assertEqual(site.get("macosArm64AssetName"), "ParqScan-macOS-arm64.dmg")
+        self.assertEqual(site.get("linuxDebAssetName"), "ParqScan-Linux-amd64.deb")
+        self.assertEqual(site.get("linuxRpmAssetName"), "ParqScan-Linux-x86_64.rpm")
 
     def test_index_has_release_download_button(self) -> None:
         index = (DOCS / "index.html").read_text(encoding="utf-8")

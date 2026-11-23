@@ -16,6 +16,30 @@
     return match && typeof match.browser_download_url === "string" ? match.browser_download_url : "";
   }
 
+  function detectPlatform(userAgent, platform) {
+    const ua = String(userAgent || "").toLowerCase();
+    const plat = String(platform || "").toLowerCase();
+    if (plat.includes("mac") || ua.includes("mac os") || ua.includes("macintosh")) {
+      return "macos";
+    }
+    if (plat.includes("linux") || (ua.includes("linux") && !ua.includes("android"))) {
+      return "linux";
+    }
+    return "windows";
+  }
+
+  function preferredAssetName(assetConfig, userAgent, platform) {
+    const config = assetConfig || {};
+    const detected = detectPlatform(userAgent, platform);
+    if (detected === "macos") {
+      return config.macosArm64AssetName || "ParqScan-macOS-arm64.dmg";
+    }
+    if (detected === "linux") {
+      return config.linuxDebAssetName || "ParqScan-Linux-amd64.deb";
+    }
+    return config.windowsAssetName || "ParqScan-Windows-Setup.exe";
+  }
+
   function releasesPageUrl(repoUrl) {
     if (typeof repoUrl !== "string" || !repoUrl) {
       return "";
@@ -34,6 +58,8 @@
   window.ParqScanRelease = {
     normalizeTag,
     findAssetUrl,
+    detectPlatform,
+    preferredAssetName,
     releasesPageUrl,
     latestDownloadUrl,
   };

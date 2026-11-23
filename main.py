@@ -5,6 +5,8 @@ import ctypes
 import datetime as dt
 import faulthandler
 import os
+import shutil
+import subprocess
 import sys
 import traceback
 from pathlib import Path
@@ -78,14 +80,47 @@ def _show_startup_error(error: BaseException, log_path: Path | None) -> None:
         details += f"\n\n详细日志：\n{log_path}"
     message = f"ParqScan 启动失败。\n\n{details}"
 
-    # 启动失败可能发生在 Qt 导入之前，因此 Windows 上使用系统消息框，确保 noconsole 构建也不会无声退出。
-    # Startup can fail before Qt is importable, so the native Windows message box ensures noconsole builds never exit silently.
+    # 启动失败可能发生在 Qt 导入之前，因此各平台优先调用原生弹窗，确保图形界面启动失败不会静默退出。
+    # Startup can fail before Qt is importable, so each platform invokes a native dialog to avoid silent exits.
     if sys.platform.startswith("win"):
         try:
             ctypes.windll.user32.MessageBoxW(None, message, "ParqScan", 0x10)
             return
         except Exception:
             pass
+    elif sys.platform == "darwin":
+        osascript = shutil.which("osascript")
+        if osascript:
+            try:
+                subprocess.run(
+                    [
+                        osascript,
+                        "-e",
+                        "on run argv",
+                        "-e",
+                        'display alert "ParqScan" message (item 1 of argv) as critical',
+                        "-e",
+                        "end run",
+                        message,
+                    ],
+                    check=False,
+                    timeout=30,
+                )
+                return
+            except Exception:
+                pass
+    elif sys.platform.startswith("linux") and (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")):
+        for tool, args in (
+            ("zenity", ["--error", "--title=ParqScan", f"--text={message}"]),
+            ("kdialog", ["--error", message, "--title", "ParqScan"]),
+        ):
+            binary = shutil.which(tool)
+            if binary:
+                try:
+                    subprocess.run([binary, *args], check=False, timeout=30)
+                    return
+                except Exception:
+                    pass
     print(message, file=sys.stderr)
 
 

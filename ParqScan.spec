@@ -1,6 +1,8 @@
 # -*- mode: python ; coding: utf-8 -*-
 from pathlib import Path
+import json
 import os
+import platform
 import sys
 
 from PyInstaller.compat import is_pure_conda
@@ -13,6 +15,22 @@ BUILD_ONEFILE = os.environ.get("PARQSCAN_BUILD_ONEFILE", "0") == "1"
 BUILD_DEBUG = os.environ.get("PARQSCAN_BUILD_DEBUG", "0") == "1"
 IS_WINDOWS = sys.platform.startswith("win")
 IS_MACOS = sys.platform == "darwin"
+IS_LINUX = sys.platform.startswith("linux")
+
+
+def _read_app_version() -> str:
+    release_file = ROOT / "parqscan" / "resources" / "release.json"
+    try:
+        payload = json.loads(release_file.read_text(encoding="utf-8"))
+        value = payload.get("release") if isinstance(payload, dict) else None
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    except OSError:
+        pass
+    return "0.0.0"
+
+
+APP_VERSION = _read_app_version()
 
 # 项目运行时只依赖 PySide6；排除其他 Qt 绑定可防止同一冻结产物混入多套互不兼容的 Qt 插件。
 # The runtime depends only on PySide6; excluding other bindings prevents incompatible Qt plugin sets from entering the same frozen artifact.
@@ -63,6 +81,10 @@ def _collect_qt_plugins(plugin_type: str) -> list:
 
 
 QT_PLUGIN_BINARIES = _collect_qt_plugins("iconengines") + _collect_qt_plugins("imageformats")
+if IS_MACOS:
+    QT_PLUGIN_BINARIES += _collect_qt_plugins("platforms") + _collect_qt_plugins("styles")
+elif IS_LINUX:
+    QT_PLUGIN_BINARIES += _collect_qt_plugins("platforms") + _collect_qt_plugins("platformthemes")
 
 # 官方 PyArrow hook 只收集 pyarrow 包目录内的 DLL；Conda 会把 Arrow 及其依赖放在 Library/bin，因此需额外收集该发行包的共享库依赖。
 # The official PyArrow hook only collects DLLs inside the pyarrow package; Conda stores Arrow and its dependencies in Library/bin, so those distribution DLLs must be added separately.
@@ -82,6 +104,31 @@ if is_pure_conda:
         print(f"WARNING: Unable to collect Conda PyArrow DLL dependencies explicitly: {error}")
 
 WINDOWS_ICON = str(ROOT / "parqscan" / "resources" / "ParqScan.ico") if IS_WINDOWS else None
+MACOS_ICON_PATH = ROOT / "parqscan" / "resources" / "ParqScan.icns"
+MACOS_ICON = str(MACOS_ICON_PATH) if IS_MACOS and MACOS_ICON_PATH.is_file() else None
+MACOS_TARGET_ARCH = (
+    os.environ.get("PARQSCAN_TARGET_ARCH", "").strip()
+    or ("arm64" if IS_MACOS and platform.machine().lower() in {"arm64", "aarch64"} else None)
+)
+MACOS_INFO_PLIST = {
+    "CFBundleName": "ParqScan",
+    "CFBundleDisplayName": "ParqScan",
+    "CFBundleIdentifier": "io.github.selfemo.parqscan",
+    "CFBundleShortVersionString": APP_VERSION,
+    "CFBundleVersion": APP_VERSION,
+    "NSHighResolutionCapable": True,
+    "LSMinimumSystemVersion": "12.0",
+    "LSApplicationCategoryType": "public.app-category.developer-tools",
+    "CFBundleDocumentTypes": [
+        {
+            "CFBundleTypeName": "Apache Parquet File",
+            "CFBundleTypeRole": "Viewer",
+            "LSHandlerRank": "Alternate",
+            "CFBundleTypeExtensions": ["parquet", "parq", "pq"],
+            "CFBundleTypeMIMETypes": ["application/vnd.apache.parquet", "application/x-parquet"],
+        }
+    ],
+}
 
 analysis = Analysis(
     [str(ROOT / "main.py")],
@@ -112,8 +159,8 @@ if IS_MACOS:
         console=BUILD_DEBUG,
         disable_windowed_traceback=False,
         argv_emulation=False,
-        target_arch=None,
-        codesign_identity=None,
+        target_arch=MACOS_TARGET_ARCH,
+        codesign_identity=os.environ.get("PARQSCAN_CODESIGN_IDENTITY") or None,
         entitlements_file=None,
     )
     collection = COLLECT(
@@ -128,8 +175,9 @@ if IS_MACOS:
     app = BUNDLE(
         collection,
         name="ParqScan.app",
-        icon=None,
-        bundle_identifier="ParqScan.Desktop",
+        icon=MACOS_ICON,
+        bundle_identifier="io.github.selfemo.parqscan",
+        info_plist=MACOS_INFO_PLIST,
     )
 elif BUILD_ONEFILE:
     executable = EXE(
@@ -145,7 +193,7 @@ elif BUILD_ONEFILE:
         upx=False,
         upx_exclude=[],
         runtime_tmpdir=None,
-        console=BUILD_DEBUG if IS_WINDOWS else True,
+        console=BUILD_DEBUG,
         disable_windowed_traceback=False,
         argv_emulation=False,
         target_arch=None,
@@ -164,7 +212,7 @@ else:
         bootloader_ignore_signals=False,
         strip=False,
         upx=False,
-        console=BUILD_DEBUG if IS_WINDOWS else True,
+        console=BUILD_DEBUG,
         disable_windowed_traceback=False,
         argv_emulation=False,
         target_arch=None,

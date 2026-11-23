@@ -34,6 +34,13 @@ class AppIconTests(unittest.TestCase):
             paths = _icon_candidate_paths()
         self.assertEqual(paths[0].name, "ParqScan.ico")
 
+    def test_macos_icon_candidates_prefer_icns(self) -> None:
+        with patch.object(sys, "platform", "darwin"):
+            paths = _icon_candidate_paths()
+        self.assertEqual(paths[0].name, "ParqScan.icns")
+        self.assertEqual(paths[1].name, "ParqScan.png")
+        self.assertEqual(paths[2].name, "ParqScan.svg")
+
     def test_non_windows_icon_candidates_prefer_svg(self) -> None:
         with patch.object(sys, "platform", "linux"):
             paths = _icon_candidate_paths()

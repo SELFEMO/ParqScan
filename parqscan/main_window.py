@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import sys
 import webbrowser
 from dataclasses import dataclass
 from pathlib import Path
@@ -8,7 +9,7 @@ from typing import Callable
 
 import psutil
 from PySide6.QtCore import QByteArray, QSize, QTimer, Qt
-from PySide6.QtGui import QAction, QActionGroup, QDragEnterEvent, QDropEvent, QIcon
+from PySide6.QtGui import QAction, QActionGroup, QDragEnterEvent, QDropEvent, QIcon, QKeySequence
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -19,6 +20,7 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QMainWindow,
+    QMenu,
     QProgressDialog,
     QPushButton,
     QSplitter,
@@ -172,22 +174,26 @@ class MainWindow(QMainWindow):
 
     def _create_menus(self) -> None:
         menu_bar = self.menuBar()
+        is_macos = sys.platform == "darwin"
 
-        def add_rounded_menu() -> RoundedMenu:
-            menu = RoundedMenu(self)
+        def add_top_menu() -> QMenu:
+            # macOS 原生顶部全局菜单栏不应使用自定义圆角蒙版菜单，避免菜单项渲染异常。
+            # Native macOS menu bar items should use standard QMenu instead of masked RoundedMenu popups.
+            menu: QMenu = QMenu(self) if is_macos else RoundedMenu(self)
             menu_bar.addMenu(menu)
             return menu
 
-        self.file_menu = add_rounded_menu()
+        self.file_menu = add_top_menu()
         self.open_action = QAction(self)
-        self.open_action.setShortcut("Ctrl+O")
+        self.open_action.setShortcut(QKeySequence.StandardKey.Open)
         self.open_action.triggered.connect(self.open_file_dialog)
-        self.recent_menu = RoundedMenu(self)
+        self.recent_menu: QMenu = QMenu(self) if is_macos else RoundedMenu(self)
         self.close_action = QAction(self)
-        self.close_action.setShortcut("Ctrl+W")
+        self.close_action.setShortcut(QKeySequence.StandardKey.Close)
         self.close_action.triggered.connect(self.close_current_document)
         self.exit_action = QAction(self)
-        self.exit_action.setShortcut("Ctrl+Q")
+        self.exit_action.setShortcut(QKeySequence.StandardKey.Quit)
+        self.exit_action.setMenuRole(QAction.MenuRole.QuitRole)
         self.exit_action.triggered.connect(self.close)
         self.file_menu.addAction(self.open_action)
         self.file_menu.addMenu(self.recent_menu)
@@ -195,7 +201,7 @@ class MainWindow(QMainWindow):
         self.file_menu.addAction(self.close_action)
         self.file_menu.addAction(self.exit_action)
 
-        self.export_menu = add_rounded_menu()
+        self.export_menu = add_top_menu()
         self.export_actions: dict[str, QAction] = {}
         for kind in ("csv", "json", "excel", "markdown", "sql"):
             action = QAction(self)
@@ -207,29 +213,29 @@ class MainWindow(QMainWindow):
         self.fragment_action.triggered.connect(self.export_fragment)
         self.export_menu.addAction(self.fragment_action)
 
-        self.view_menu = add_rounded_menu()
+        self.view_menu = add_top_menu()
         self.search_action = QAction(self)
-        self.search_action.setShortcut("Ctrl+F")
+        self.search_action.setShortcut(QKeySequence.StandardKey.Find)
         self.search_action.triggered.connect(self.focus_search)
         self.view_menu.addAction(self.search_action)
 
         self.find_next_action = QAction(self)
-        self.find_next_action.setShortcut("F3")
+        self.find_next_action.setShortcut(QKeySequence.StandardKey.FindNext)
         self.find_next_action.triggered.connect(lambda: self._navigate_current_search(1))
         self.addAction(self.find_next_action)
 
         self.find_prev_action = QAction(self)
-        self.find_prev_action.setShortcut("Shift+F3")
+        self.find_prev_action.setShortcut(QKeySequence.StandardKey.FindPrevious)
         self.find_prev_action.triggered.connect(lambda: self._navigate_current_search(-1))
         self.addAction(self.find_prev_action)
 
         self.tab_meta_action = QAction(self)
-        self.tab_meta_action.setShortcut("Alt+1")
+        self.tab_meta_action.setShortcut("Ctrl+1" if is_macos else "Alt+1")
         self.tab_meta_action.triggered.connect(lambda: self._switch_current_tab(0))
         self.addAction(self.tab_meta_action)
 
         self.tab_data_action = QAction(self)
-        self.tab_data_action.setShortcut("Alt+2")
+        self.tab_data_action.setShortcut("Ctrl+2" if is_macos else "Alt+2")
         self.tab_data_action.triggered.connect(lambda: self._switch_current_tab(1))
         self.addAction(self.tab_data_action)
         self.view_menu.addSeparator()
@@ -245,7 +251,7 @@ class MainWindow(QMainWindow):
         selected_theme = self.config.get("theme", "system")
         self.theme_actions.get(selected_theme, self.theme_actions["system"]).setChecked(True)
 
-        self.language_menu = add_rounded_menu()
+        self.language_menu = add_top_menu()
         self.language_group = QActionGroup(self)
         self.language_group.setExclusive(True)
         self.language_actions: dict[str, QAction] = {}
@@ -257,11 +263,12 @@ class MainWindow(QMainWindow):
             self.language_actions[language] = action
         self.language_actions[self.translator.language].setChecked(True)
 
-        self.help_menu = add_rounded_menu()
+        self.help_menu = add_top_menu()
         self.check_updates_action = QAction(self)
         self.check_updates_action.triggered.connect(self.check_updates_manual)
         self.help_menu.addAction(self.check_updates_action)
         self.about_action = QAction(self)
+        self.about_action.setMenuRole(QAction.MenuRole.AboutRole)
         self.about_action.triggered.connect(self.show_about)
         self.help_menu.addAction(self.about_action)
         if self.update_controller is not None:
@@ -632,7 +639,8 @@ class MainWindow(QMainWindow):
         if self._update_progress is not None:
             self._update_progress.close()
             self._update_progress = None
-        show_message(self, self.translator.tr("update.available_title"), self.translator.tr("update.installing"))
+        message_key = "update.installing_macos" if sys.platform == "darwin" else "update.installing"
+        show_message(self, self.translator.tr("update.available_title"), self.translator.tr(message_key))
         UpdateController.launch_installer(installer_path)
         QApplication.instance().quit()
 
@@ -700,8 +708,9 @@ class MainWindow(QMainWindow):
         self._update_rows_status(self.current_context().widget.data_widget.model.loaded_rows if self.current_context() else 0)
         self._update_memory_status()
         self._rebuild_recent_menu()
-        self.close_action.setEnabled(False)
-        self.export_menu.setEnabled(False)
+        has_doc = self.current_context() is not None
+        self.close_action.setEnabled(has_doc)
+        self.export_menu.setEnabled(has_doc)
 
     def dragEnterEvent(self, event: QDragEnterEvent) -> None:
         if event.mimeData().hasUrls() and any(url.toLocalFile().lower().endswith((".parquet", ".parq", ".pq")) for url in event.mimeData().urls()):

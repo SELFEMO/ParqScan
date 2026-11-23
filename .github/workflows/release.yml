@@ -10,9 +10,27 @@ permissions:
   contents: write
 
 jobs:
-  build-windows-installer:
-    runs-on: windows-latest
+  verify-tag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
+      - name: Verify tag matches release metadata
+        run: |
+          python3 - <<'PY'
+          import json, os, re
+          tag = os.environ["GITHUB_REF_NAME"]
+          expected = re.sub(r"^(?:pre-release-)?v", "", tag)
+          release = json.loads(open("parqscan/resources/release.json", encoding="utf-8").read())["release"]
+          if release != expected:
+              raise SystemExit(f"Tag {tag} does not match parqscan/resources/release.json release {release}")
+          print(f"Verified tag {tag} matches release {release}")
+          PY
+
+  build-windows:
+    needs: verify-tag
+    runs-on: windows-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -23,17 +41,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: python -m pip install --upgrade pip && python -m pip install -r requirements.txt
-
-      - name: Verify tag matches release metadata
-        shell: pwsh
-        run: |
-          $tag = "${{ github.ref_name }}"
-          $expected = $tag -replace '^pre-release-v', '' -replace '^v', ''
-          $release = (Get-Content parqscan/resources/release.json | ConvertFrom-Json).release
-          if ($release -ne $expected) {
-            throw "Tag $tag does not match parqscan/resources/release.json release $release"
-          }
+        run: python -m pip install --upgrade pip && python -m pip install -r requirements.txt pyinstaller
 
       - name: Install Inno Setup
         run: choco install innosetup -y
@@ -41,35 +49,100 @@ jobs:
       - name: Build Windows installer
         env:
           PARQSCAN_STRICT_BUILD: "1"
-        run: python build.py --installer --skip-smoke-test
+        run: python build.py --installer --package-format exe --skip-smoke-test
 
-      - name: Enforce package size limit
-        shell: pwsh
+      - name: Upload Windows installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-windows
+          path: dist/installer/ParqScan-Windows-Setup.exe
+          if-no-files-found: error
+
+  build-macos:
+    needs: verify-tag
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: python3 -m pip install --upgrade pip && python3 -m pip install -r requirements.txt pyinstaller
+
+      - name: Build macOS Apple Silicon DMG
+        env:
+          PARQSCAN_STRICT_BUILD: "1"
+          PARQSCAN_TARGET_ARCH: "arm64"
+        run: python3 build.py --installer --package-format dmg
+
+      - name: Upload macOS DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-macos-arm64
+          path: dist/installer/ParqScan-macOS-arm64.dmg
+          if-no-files-found: error
+
+  build-linux:
+    needs: verify-tag
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Linux packaging and Qt system libraries
         run: |
-          $onedir = "dist/ParqScan"
-          $installer = "dist/installer/ParqScan-Windows-Setup.exe"
-          if (-not (Test-Path $onedir)) {
-            throw "Packaged directory was not created: $onedir"
-          }
-          $onedirBytes = (Get-ChildItem $onedir -Recurse -File | Measure-Object -Property Length -Sum).Sum
-          $onedirMb = [math]::Round($onedirBytes / 1MB, 1)
-          $installerMb = 0
-          if (Test-Path $installer) {
-            $installerMb = [math]::Round((Get-Item $installer).Length / 1MB, 1)
-          }
-          if ($onedirMb -gt 600) {
-            throw "Packaged onedir is ${onedirMb} MB, which exceeds the 600 MB limit."
-          }
-          "ONEDIR_SIZE_MB=$onedirMb" | Out-File -FilePath $env:GITHUB_ENV -Append
-          "INSTALLER_SIZE_MB=$installerMb" | Out-File -FilePath $env:GITHUB_ENV -Append
+          sudo apt-get update
+          sudo apt-get install -y dpkg rpm libgl1 libegl1 libxkbcommon-x11-0 libxcb-cursor0 libdbus-1-3
+
+      - name: Install Python dependencies
+        run: python3 -m pip install --upgrade pip && python3 -m pip install -r requirements.txt pyinstaller
+
+      - name: Build Linux DEB and RPM packages
+        env:
+          PARQSCAN_STRICT_BUILD: "1"
+        run: python3 build.py --installer --package-format all
+
+      - name: Upload Linux packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-linux
+          path: |
+            dist/installer/*.deb
+            dist/installer/*.rpm
+          if-no-files-found: error
+
+  publish-release:
+    needs: [build-windows, build-macos, build-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all installer artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+          merge-multiple: true
+
+      - name: List release assets
+        run: ls -lh release-artifacts
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/installer/ParqScan-Windows-Setup.exe
+          files: release-artifacts/*
           generate_release_notes: true
           append_body: true
           prerelease: ${{ startsWith(github.ref_name, 'pre-release-') }}
           body: |
-            Windows installer: ParqScan-Windows-Setup.exe (${{ env.INSTALLER_SIZE_MB }} MB)
-            Packaged onedir size: ${{ env.ONEDIR_SIZE_MB }} MB
+            ### Installers
+            - **Windows (x64)**: `ParqScan-Windows-Setup.exe`
+            - **macOS (Apple Silicon / arm64)**: `ParqScan-macOS-arm64.dmg`
+            - **Linux (Debian / Ubuntu)**: `ParqScan-Linux-amd64.deb`
+            - **Linux (Fedora / RHEL / openSUSE)**: `ParqScan-Linux-x86_64.rpm`

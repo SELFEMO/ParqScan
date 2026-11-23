@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import subprocess
 import sys
 import tempfile
@@ -8,13 +7,14 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 from PySide6.QtCore import QObject, QThread, Qt, Signal, Slot
 
 from parqscan.config import ConfigManager
 from parqscan.release import release_name
-from parqscan.update.constants import CHECK_INTERVAL_SECONDS, GITHUB_REPO, WINDOWS_ASSET_NAME
+from parqscan.update.constants import CHECK_INTERVAL_SECONDS, GITHUB_REPO
 from parqscan.update.github import ReleaseInfo, fetch_latest_release
 from parqscan.update.versioning import compare_versions
 
@@ -156,13 +156,22 @@ class UpdateController(QObject):
     def set_pending_release(self, release: ReleaseInfo | None) -> None:
         self._pending_release = release
 
+    @staticmethod
+    def _download_filename(release: ReleaseInfo) -> str:
+        parsed_name = Path(urlparse(release.download_url).path).name
+        if parsed_name:
+            return f"ParqScan-{release.version}-{parsed_name}"
+        if sys.platform == "darwin":
+            return f"ParqScan-{release.version}.dmg"
+        return f"ParqScan-{release.version}-setup.exe"
+
     def download_and_install(self, release: ReleaseInfo) -> None:
         if self._download_thread is not None and self._download_thread.isRunning():
             return
         if not release.download_url:
             self.download_failed.emit("missing_download_url")
             return
-        target = Path(tempfile.gettempdir()) / f"ParqScan-{release.version}-setup.exe"
+        target = Path(tempfile.gettempdir()) / self._download_filename(release)
         thread = QThread(self)
         worker = UpdateDownloadWorker(release.download_url, target)
         worker.moveToThread(thread)
@@ -181,7 +190,7 @@ class UpdateController(QObject):
 
     @staticmethod
     def can_install_in_place() -> bool:
-        return sys.platform.startswith("win")
+        return sys.platform.startswith("win") or sys.platform == "darwin"
 
     @staticmethod
     def releases_page_url() -> str:
@@ -189,6 +198,9 @@ class UpdateController(QObject):
 
     @staticmethod
     def launch_installer(installer_path: str) -> None:
+        if sys.platform == "darwin":
+            subprocess.Popen(["open", installer_path], close_fds=True)
+            return
         subprocess.Popen([installer_path, "/SILENT", "/CLOSEAPPLICATIONS"], close_fds=True)
 
     def _auto_check_enabled(self) -> bool:

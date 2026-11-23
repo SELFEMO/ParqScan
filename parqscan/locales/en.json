@@ -234,6 +234,7 @@
     "downloading": "Downloading update…",
     "download_failed": "Could not download the update: {error}",
     "installing": "ParqScan will restart to install the update.",
-    "non_windows_text": "Download the latest release from GitHub to update on this platform."
+    "installing_macos": "The disk image has been downloaded. ParqScan will open the DMG and exit so you can drag ParqScan into Applications.",
+    "non_windows_text": "Download the latest package for your platform from GitHub Releases to update."
   }
 }
