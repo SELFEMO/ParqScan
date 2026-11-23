@@ -27,7 +27,7 @@
     "ctaDownload": "下载安装包",
     "ctaDownloadPlatform": "下载 {platform}",
     "ctaReleases": "查看 Releases",
-    "noPackageNotice": "当前发布暂未附带 {platform} 安装包，请前往 Releases 页面查看或从源码运行。",
+    "noPackageNotice": "当前最新发布暂未附带 {platform} 安装包，需要手动编译打包后安装（macOS 运行 ./scripts/build_macos.sh，Linux 运行 ./scripts/build_linux.sh），或前往 Releases 查看。",
     "ctaGuide": "使用说明",
     "ctaSource": "查看源码",
     "demoLabel": "交互示意（非真实文件）",

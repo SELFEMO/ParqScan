@@ -27,7 +27,7 @@
     "ctaDownload": "Download",
     "ctaDownloadPlatform": "Download for {platform}",
     "ctaReleases": "View Releases",
-    "noPackageNotice": "No {platform} installer is attached to the current release yet. View Releases or run from source.",
+    "noPackageNotice": "No {platform} installer is attached to the latest release yet. Build and install manually from source (./scripts/build_macos.sh on macOS, ./scripts/build_linux.sh on Linux) or check Releases.",
     "ctaGuide": "User guide",
     "ctaSource": "View source",
     "demoLabel": "Interactive demo (not a real file)",
