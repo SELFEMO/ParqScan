@@ -26,12 +26,13 @@ class UpdateCheckResult:
 
 
 class UpdateCheckWorker(QObject):
-    finished = Signal(object, bool)
-    failed = Signal(str, bool)
+    finished = Signal(object, bool, int)
+    failed = Signal(str, bool, int)
 
-    def __init__(self, manual: bool) -> None:
+    def __init__(self, manual: bool, generation: int = 0) -> None:
         super().__init__()
         self.manual = manual
+        self.generation = generation
 
     @Slot()
     def run(self) -> None:
@@ -39,11 +40,15 @@ class UpdateCheckWorker(QObject):
             release = fetch_latest_release()
             current_version = release_name()
             if compare_versions(release.version, current_version) <= 0:
-                self.finished.emit(None, self.manual)
+                self.finished.emit(None, self.manual, self.generation)
                 return
-            self.finished.emit(UpdateCheckResult(release=release, current_version=current_version), self.manual)
+            self.finished.emit(
+                UpdateCheckResult(release=release, current_version=current_version),
+                self.manual,
+                self.generation,
+            )
         except Exception as error:
-            self.failed.emit(str(error), self.manual)
+            self.failed.emit(str(error), self.manual, self.generation)
 
 
 class UpdateDownloadWorker(QObject):
@@ -123,18 +128,12 @@ class UpdateController(QObject):
         generation = self._check_generation
         self._manual_upgrade_requested = manual
         thread = QThread(self)
-        worker = UpdateCheckWorker(manual)
+        worker = UpdateCheckWorker(manual, generation)
         worker.moveToThread(thread)
         self._check_worker = worker
         thread.started.connect(worker.run)
-        worker.finished.connect(
-            lambda result, is_manual, gen=generation: self._handle_check_worker_finished(result, is_manual, gen),
-            Qt.ConnectionType.QueuedConnection,
-        )
-        worker.failed.connect(
-            lambda message, is_manual, gen=generation: self._handle_check_worker_failed(message, is_manual, gen),
-            Qt.ConnectionType.QueuedConnection,
-        )
+        worker.finished.connect(self._handle_check_worker_finished, Qt.ConnectionType.QueuedConnection)
+        worker.failed.connect(self._handle_check_worker_failed, Qt.ConnectionType.QueuedConnection)
         worker.finished.connect(thread.quit)
         worker.failed.connect(thread.quit)
         thread.finished.connect(worker.deleteLater)
@@ -227,7 +226,7 @@ class UpdateController(QObject):
         self._check_in_progress = False
         self._manual_upgrade_requested = False
 
-    @Slot(object, bool)
+    @Slot(object, bool, int)
     def _handle_check_worker_finished(self, result: Any, manual: bool, generation: int | None = None) -> None:
         if generation is not None and generation != self._check_generation:
             return
@@ -236,7 +235,7 @@ class UpdateController(QObject):
         self._manual_upgrade_requested = False
         self.check_finished.emit(result, effective_manual)
 
-    @Slot(str, bool)
+    @Slot(str, bool, int)
     def _handle_check_worker_failed(self, message: str, manual: bool, generation: int | None = None) -> None:
         if generation is not None and generation != self._check_generation:
             return
