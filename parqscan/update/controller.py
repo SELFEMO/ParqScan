@@ -93,9 +93,13 @@ class UpdateController(QObject):
         super().__init__(parent)
         self.config = config
         self._check_thread: QThread | None = None
+        self._check_worker: UpdateCheckWorker | None = None
         self._download_thread: QThread | None = None
+        self._download_worker: UpdateDownloadWorker | None = None
         self._pending_release: ReleaseInfo | None = None
         self._check_in_progress = False
+        self._check_generation = 0
+        self._manual_upgrade_requested = False
 
     def maybe_auto_check(self) -> None:
         if not self._auto_check_enabled():
@@ -107,6 +111,7 @@ class UpdateController(QObject):
     def check_for_updates(self, manual: bool = False) -> None:
         if self._check_in_progress:
             if manual:
+                self._manual_upgrade_requested = True
                 self.check_busy.emit()
             return
         if not manual and not self._should_check_now():
@@ -114,12 +119,22 @@ class UpdateController(QObject):
         if not manual:
             self._record_check_time()
         self._check_in_progress = True
+        self._check_generation += 1
+        generation = self._check_generation
+        self._manual_upgrade_requested = manual
         thread = QThread(self)
         worker = UpdateCheckWorker(manual)
         worker.moveToThread(thread)
+        self._check_worker = worker
         thread.started.connect(worker.run)
-        worker.finished.connect(self._handle_check_worker_finished, Qt.ConnectionType.QueuedConnection)
-        worker.failed.connect(self._handle_check_worker_failed, Qt.ConnectionType.QueuedConnection)
+        worker.finished.connect(
+            lambda result, is_manual, gen=generation: self._handle_check_worker_finished(result, is_manual, gen),
+            Qt.ConnectionType.QueuedConnection,
+        )
+        worker.failed.connect(
+            lambda message, is_manual, gen=generation: self._handle_check_worker_failed(message, is_manual, gen),
+            Qt.ConnectionType.QueuedConnection,
+        )
         worker.finished.connect(thread.quit)
         worker.failed.connect(thread.quit)
         thread.finished.connect(worker.deleteLater)
@@ -152,6 +167,7 @@ class UpdateController(QObject):
         thread = QThread(self)
         worker = UpdateDownloadWorker(release.download_url, target)
         worker.moveToThread(thread)
+        self._download_worker = worker
         thread.started.connect(worker.run)
         worker.progress.connect(self.download_progress.emit, Qt.ConnectionType.QueuedConnection)
         worker.finished.connect(self._on_download_finished, Qt.ConnectionType.QueuedConnection)
@@ -204,15 +220,30 @@ class UpdateController(QObject):
     def _record_check_time(self) -> None:
         self.config.set("last_update_check", datetime.now(timezone.utc).isoformat())
 
-    @Slot(object, bool)
-    def _handle_check_worker_finished(self, result: Any, manual: bool) -> None:
+    def cancel_check(self) -> None:
+        if not self._check_in_progress:
+            return
+        self._check_generation += 1
         self._check_in_progress = False
-        self.check_finished.emit(result, manual)
+        self._manual_upgrade_requested = False
+
+    @Slot(object, bool)
+    def _handle_check_worker_finished(self, result: Any, manual: bool, generation: int | None = None) -> None:
+        if generation is not None and generation != self._check_generation:
+            return
+        effective_manual = manual or self._manual_upgrade_requested
+        self._check_in_progress = False
+        self._manual_upgrade_requested = False
+        self.check_finished.emit(result, effective_manual)
 
     @Slot(str, bool)
-    def _handle_check_worker_failed(self, message: str, manual: bool) -> None:
+    def _handle_check_worker_failed(self, message: str, manual: bool, generation: int | None = None) -> None:
+        if generation is not None and generation != self._check_generation:
+            return
+        effective_manual = manual or self._manual_upgrade_requested
         self._check_in_progress = False
-        self.check_failed.emit(message, manual)
+        self._manual_upgrade_requested = False
+        self.check_failed.emit(message, effective_manual)
 
     @Slot(str)
     def _on_download_finished(self, installer_path: str) -> None:
@@ -220,6 +251,10 @@ class UpdateController(QObject):
 
     def _clear_check_thread(self) -> None:
         self._check_thread = None
+        self._check_worker = None
+        if self._check_in_progress:
+            self._check_in_progress = False
 
     def _clear_download_thread(self) -> None:
         self._download_thread = None
+        self._download_worker = None

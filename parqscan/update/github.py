@@ -54,7 +54,7 @@ def parse_release_payload(payload: dict[str, Any], asset_name: str = WINDOWS_ASS
 def _fetch_releases_payload(api_url: str = RELEASES_LIST_API_URL) -> list[dict[str, Any]]:
     request = Request(api_url, headers={"Accept": "application/vnd.github+json", "User-Agent": USER_AGENT})
     try:
-        with urlopen(request, timeout=30) as response:
+        with urlopen(request, timeout=10) as response:
             payload = json.load(response)
     except HTTPError as error:
         raise RuntimeError(f"GitHub API returned HTTP {error.code}.") from error

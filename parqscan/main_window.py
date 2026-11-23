@@ -518,7 +518,7 @@ class MainWindow(QMainWindow):
         self._close_update_check_progress()
         progress = QProgressDialog(
             self.translator.tr("update.checking"),
-            "",
+            self.translator.tr("common.cancel"),
             0,
             0,
             self,
@@ -527,18 +527,20 @@ class MainWindow(QMainWindow):
         progress.setWindowTitle(self.translator.tr("update.checking_title"))
         progress.setWindowModality(Qt.WindowModality.WindowModal)
         progress.setMinimumDuration(0)
-        progress.setCancelButton(None)
         progress.setAutoClose(False)
         progress.setRange(0, 0)
+        progress.canceled.connect(self._cancel_update_check)
         progress.show()
         self._update_check_progress = progress
 
+    def _cancel_update_check(self) -> None:
+        if self.update_controller is not None:
+            self.update_controller.cancel_check()
+        self._close_update_check_progress()
+
     def _on_update_check_busy(self) -> None:
-        show_message(
-            self,
-            self.translator.tr("update.checking_title"),
-            self.translator.tr("update.already_checking"),
-        )
+        if self._update_check_progress is None:
+            self._on_update_check_started(True)
 
     def _close_update_check_progress(self) -> None:
         if self._update_check_progress is not None:
