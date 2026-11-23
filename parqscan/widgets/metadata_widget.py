@@ -26,6 +26,8 @@ from parqscan.widgets.design_system import CardFrame, ElidingLabel, HintToolButt
 
 
 class MetadataWidget(QWidget):
+    status_message = Signal(str)
+
     GROUP_INDEX_ROLE = Qt.ItemDataRole.UserRole + 1
     PLACEHOLDER_ROLE = Qt.ItemDataRole.UserRole + 2
 
