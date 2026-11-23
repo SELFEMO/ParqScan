@@ -70,30 +70,18 @@
     return config.windowsAssetName || "ParqScan-Windows-Setup.exe";
   }
 
-  function selectReleases(releases) {
+  function selectNewestRelease(releases) {
     if (!Array.isArray(releases)) {
-      return { stable: null, prerelease: null };
+      return null;
     }
     const published = releases.filter((item) => item && !item.draft && typeof item.tag_name === "string");
-    let stable = null;
-    let newestPrerelease = null;
-
+    let newest = null;
     for (const item of published) {
-      if (item.prerelease) {
-        if (!newestPrerelease || compareVersions(item.tag_name, newestPrerelease.tag_name) > 0) {
-          newestPrerelease = item;
-        }
-      } else if (!stable || compareVersions(item.tag_name, stable.tag_name) > 0) {
-        stable = item;
+      if (!newest || compareVersions(item.tag_name, newest.tag_name) > 0) {
+        newest = item;
       }
     }
-
-    const prerelease =
-      newestPrerelease && (!stable || compareVersions(newestPrerelease.tag_name, stable.tag_name) > 0)
-        ? newestPrerelease
-        : null;
-
-    return { stable, prerelease };
+    return newest;
   }
 
   function resolveDownloadInfo(releasePayload, assetConfig, userAgent, platform, repoUrl) {
@@ -144,7 +132,7 @@
     detectPlatform,
     platformDisplayName,
     preferredAssetName,
-    selectReleases,
+    selectNewestRelease,
     resolveDownloadInfo,
     releasesPageUrl,
     allReleasesPageUrl,
