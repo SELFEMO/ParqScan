@@ -176,14 +176,14 @@ class MainWindow(QMainWindow):
         menu_bar = self.menuBar()
         is_macos = sys.platform == "darwin"
 
-        def add_top_menu() -> QMenu:
+        def add_rounded_menu() -> QMenu:
             # macOS 原生顶部全局菜单栏不应使用自定义圆角蒙版菜单，避免菜单项渲染异常。
             # Native macOS menu bar items should use standard QMenu instead of masked RoundedMenu popups.
             menu: QMenu = QMenu(self) if is_macos else RoundedMenu(self)
             menu_bar.addMenu(menu)
             return menu
 
-        self.file_menu = add_top_menu()
+        self.file_menu = add_rounded_menu()
         self.open_action = QAction(self)
         self.open_action.setShortcut(QKeySequence.StandardKey.Open)
         self.open_action.triggered.connect(self.open_file_dialog)
@@ -201,7 +201,7 @@ class MainWindow(QMainWindow):
         self.file_menu.addAction(self.close_action)
         self.file_menu.addAction(self.exit_action)
 
-        self.export_menu = add_top_menu()
+        self.export_menu = add_rounded_menu()
         self.export_actions: dict[str, QAction] = {}
         for kind in ("csv", "json", "excel", "markdown", "sql"):
             action = QAction(self)
@@ -213,7 +213,7 @@ class MainWindow(QMainWindow):
         self.fragment_action.triggered.connect(self.export_fragment)
         self.export_menu.addAction(self.fragment_action)
 
-        self.view_menu = add_top_menu()
+        self.view_menu = add_rounded_menu()
         self.search_action = QAction(self)
         self.search_action.setShortcut(QKeySequence.StandardKey.Find)
         self.search_action.triggered.connect(self.focus_search)
@@ -251,7 +251,7 @@ class MainWindow(QMainWindow):
         selected_theme = self.config.get("theme", "system")
         self.theme_actions.get(selected_theme, self.theme_actions["system"]).setChecked(True)
 
-        self.language_menu = add_top_menu()
+        self.language_menu = add_rounded_menu()
         self.language_group = QActionGroup(self)
         self.language_group.setExclusive(True)
         self.language_actions: dict[str, QAction] = {}
@@ -263,7 +263,7 @@ class MainWindow(QMainWindow):
             self.language_actions[language] = action
         self.language_actions[self.translator.language].setChecked(True)
 
-        self.help_menu = add_top_menu()
+        self.help_menu = add_rounded_menu()
         self.check_updates_action = QAction(self)
         self.check_updates_action.triggered.connect(self.check_updates_manual)
         self.help_menu.addAction(self.check_updates_action)

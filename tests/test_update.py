@@ -46,7 +46,9 @@ class GitHubReleaseTests(unittest.TestCase):
                 {"name": "ParqScan-Windows-Setup.exe", "browser_download_url": "https://example.com/setup.exe"},
             ],
         }
-        release = parse_release_payload(payload)
+        from parqscan.update.constants import WINDOWS_ASSET_NAME
+
+        release = parse_release_payload(payload, asset_name=WINDOWS_ASSET_NAME)
         self.assertEqual(release.version, "0.3.2")
         self.assertEqual(release.download_url, "https://example.com/setup.exe")
         self.assertEqual(release.release_page_url, payload["html_url"])
@@ -78,7 +80,9 @@ class GitHubReleaseTests(unittest.TestCase):
         response.__exit__.return_value = False
         with patch("parqscan.update.github.urlopen", return_value=response):
             with patch("parqscan.update.github.json.load", return_value=payloads):
-                release = fetch_latest_release()
+                from parqscan.update.constants import WINDOWS_ASSET_NAME
+
+                release = fetch_latest_release(asset_name=WINDOWS_ASSET_NAME)
         self.assertEqual(release.version, "0.3.2")
         self.assertEqual(release.download_url, "https://example.com/032.exe")
 
