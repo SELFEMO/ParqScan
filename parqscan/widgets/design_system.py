@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from PySide6.QtCore import QEvent, QPoint, QRectF, QSize, QTimer, Qt, Signal
 from PySide6.QtGui import (
+    QGuiApplication,
     QBrush,
     QIcon,
     QImage,
@@ -43,7 +44,7 @@ from PySide6.QtWidgets import (
 
 from parqscan.constants import PAGE_SIZE_OPTIONS
 from parqscan.i18n import Translator
-from parqscan.utils.icons import make_icon
+from parqscan.utils.icons import make_icon, make_themed_icon
 
 
 def _apply_rounded_mask(widget: QWidget, radius: int = 10) -> None:
@@ -155,7 +156,7 @@ class RoundedComboBox(QComboBox):
             if self.isEnabled()
             else QPalette.ColorGroup.Disabled
         )
-        painter.setPen(self.palette().color(color_group, QPalette.ColorRole.Text))
+        painter.setPen(option.palette.color(color_group, QPalette.ColorRole.Text))
         painter.drawText(text_rect, int(alignment), visible_text)
 
     def showPopup(self) -> None:  # noqa: N802 - Qt naming convention
@@ -164,7 +165,7 @@ class RoundedComboBox(QComboBox):
         content_width = 0
         for row in range(self.count()):
             content_width = max(content_width, self.fontMetrics().horizontalAdvance(self.itemText(row)))
-        popup_width = max(self.width(), content_width + 30)
+        popup_width = max(self.width(), content_width + 44)
         self.view().setFixedWidth(popup_width)
         super().showPopup()
         QTimer.singleShot(0, self._style_popup_window)
@@ -234,7 +235,7 @@ class SearchField(QFrame):
 
         self.icon_label = QLabel()
         self.icon_label.setObjectName("SearchFieldIcon")
-        self.icon_label.setPixmap(make_icon("search", "#718096", 16).pixmap(16, 16))
+        self.refresh_theme("light")
         self.icon_label.setFixedSize(18, 18)
         self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
@@ -248,6 +249,16 @@ class SearchField(QFrame):
         layout.setSpacing(7)
         layout.addWidget(self.icon_label)
         layout.addWidget(self.editor, 1)
+
+    def refresh_theme(self, theme: str = "light") -> None:
+        self.icon_label.setPixmap(make_themed_icon("search", theme, "muted", 16).pixmap(16, 16))
+
+    def changeEvent(self, event: QEvent) -> None:  # noqa: N802 - Qt naming convention
+        super().changeEvent(event)
+        if event.type() == QEvent.Type.PaletteChange:
+            bg = self.palette().color(QPalette.ColorRole.Base)
+            theme = "dark" if bg.lightness() < 128 else "light"
+            self.refresh_theme(theme)
 
     def eventFilter(self, watched: object, event: QEvent) -> bool:
         if watched is self.editor:
@@ -270,8 +281,8 @@ class SearchField(QFrame):
 class FloatingHint(QFrame):
     """Small branded hover card that does not use the platform tooltip renderer."""
 
-    def __init__(self) -> None:
-        super().__init__(None, Qt.WindowType.Popup | Qt.WindowType.FramelessWindowHint | Qt.WindowType.NoDropShadowWindowHint)
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent, Qt.WindowType.ToolTip | Qt.WindowType.FramelessWindowHint | Qt.WindowType.NoDropShadowWindowHint)
         self.setObjectName("FloatingHint")
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
@@ -288,7 +299,8 @@ class FloatingHint(QFrame):
         self.label.setText(text)
         self.adjustSize()
         point = owner.mapToGlobal(QPoint(owner.width() // 2 - self.width() // 2, owner.height() + 7))
-        screen = owner.screen().availableGeometry() if owner.screen() is not None else owner.rect()
+        screen_obj = QGuiApplication.screenAt(point) or owner.screen() or QGuiApplication.primaryScreen()
+        screen = screen_obj.availableGeometry() if screen_obj is not None else owner.rect()
         x = max(screen.left() + 6, min(point.x(), screen.right() - self.width() - 6))
         y = point.y() if point.y() + self.height() <= screen.bottom() else owner.mapToGlobal(QPoint(0, -self.height() - 7)).y()
         self.move(x, y)
@@ -304,7 +316,7 @@ class HintToolButton(QToolButton):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._hint_text = ""
-        self._floating_hint = FloatingHint()
+        self._floating_hint = FloatingHint(self)
         self._hint_timer = QTimer(self)
         self._hint_timer.setSingleShot(True)
         self._hint_timer.setInterval(360)
@@ -364,11 +376,13 @@ class ResponsiveImageLabel(QLabel):
             return
         # 中文：详情图片默认按画布等比缩放，窗口变化时重新计算，避免原图尺寸强迫用户横纵滚动。
         # English: Detail images fit the canvas proportionally and are recalculated on resize, avoiding mandatory scrolling caused by source dimensions.
+        dpr = max(1.0, self.devicePixelRatioF())
         scaled = self._source_pixmap.scaled(
-            target,
+            target * dpr,
             Qt.AspectRatioMode.KeepAspectRatio,
             Qt.TransformationMode.SmoothTransformation,
         )
+        scaled.setDevicePixelRatio(dpr)
         QLabel.setPixmap(self, scaled)
 
 
@@ -497,6 +511,11 @@ class ZoomableImageView(QGraphicsView):
         self._zoom_by(1.15 if delta > 0 else 1 / 1.15)
         event.accept()
 
+    def changeEvent(self, event: QEvent) -> None:  # noqa: N802 - Qt naming convention
+        super().changeEvent(event)
+        if event.type() in {QEvent.Type.PaletteChange, QEvent.Type.StyleChange}:
+            self.setBackgroundBrush(QBrush(self.palette().color(QPalette.ColorRole.Base)))
+
     def resizeEvent(self, event: QResizeEvent) -> None:  # noqa: N802 - Qt naming convention
         super().resizeEvent(event)
         # 中文：图片画布包含 viewport 和滚动条，统一裁切整个控件才能让缩放状态下仍保持真实圆角。
@@ -622,7 +641,8 @@ class PaginationBar(CardFrame):
         self.page_edit.setObjectName("PageNumberEdit")
         self.page_edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.page_edit.setValidator(QIntValidator(1, 1, self.page_edit))
-        self.page_edit.setFixedWidth(50)
+        self.page_edit.setMinimumWidth(52)
+        self.page_edit.setMaximumWidth(84)
         self.page_total_label = QLabel()
         self.page_total_label.setObjectName("PaginationTotal")
         self.page_total_label.setMinimumWidth(64)
@@ -665,11 +685,24 @@ class PaginationBar(CardFrame):
     def _nav_button(icon_name: str) -> HintToolButton:
         button = HintToolButton()
         button.setProperty("paginationNav", True)
-        button.setIcon(make_icon(icon_name))
-        button.setIconSize(QSize(15, 15))
+        button.setProperty("iconName", icon_name)
+        button.setIcon(make_icon(icon_name, size=16))
+        button.setIconSize(QSize(16, 16))
         button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
         button.setFixedSize(34, 32)
         return button
+
+    def refresh_theme(self, theme: str = "light") -> None:
+        for button in (self.first_button, self.previous_button, self.next_button, self.last_button):
+            icon_name = button.property("iconName")
+            if isinstance(icon_name, str) and icon_name:
+                button.setIcon(make_themed_icon(icon_name, theme, "muted", 16))
+
+    def changeEvent(self, event: QEvent) -> None:  # noqa: N802 - Qt naming convention
+        super().changeEvent(event)
+        if event.type() == QEvent.Type.PaletteChange:
+            bg = self.palette().color(QPalette.ColorRole.Window)
+            self.refresh_theme("dark" if bg.lightness() < 128 else "light")
 
     def _emit_page(self, page_index: int) -> None:
         page_index = max(0, min(page_index, self._total_pages - 1))
@@ -790,6 +823,7 @@ class MessageDialog(QDialog):
         *,
         critical: bool = False,
         icon: QIcon | QPixmap | None = None,
+        ok_text: str = "OK",
     ) -> None:
         super().__init__(parent)
         self.setObjectName("MessageDialog")
@@ -807,9 +841,15 @@ class MessageDialog(QDialog):
             icon_label.setFixedSize(56, 56)
         elif isinstance(icon, QPixmap) and not icon.isNull():
             icon_label.setObjectName("MessageLogo")
-            icon_label.setPixmap(
-                icon.scaled(52, 52, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            dpr = max(1.0, self.devicePixelRatioF())
+            scaled_icon = icon.scaled(
+                int(52 * dpr),
+                int(52 * dpr),
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
             )
+            scaled_icon.setDevicePixelRatio(dpr)
+            icon_label.setPixmap(scaled_icon)
             icon_label.setFixedSize(56, 56)
         else:
             icon_label.setText("!" if critical else "i")
@@ -841,9 +881,10 @@ class MessageDialog(QDialog):
         content_layout.addWidget(icon_label, 0, Qt.AlignmentFlag.AlignTop)
         content_layout.addLayout(text_layout, 1)
 
-        ok_button = QPushButton("OK")
+        ok_button = QPushButton(ok_text)
         ok_button.setProperty("primary", True)
-        ok_button.setFixedSize(76, 36)
+        ok_button.setMinimumWidth(76)
+        ok_button.setFixedHeight(36)
         ok_button.clicked.connect(self.accept)
 
         card_layout = QVBoxLayout(card)
@@ -870,8 +911,9 @@ def show_message(
     *,
     critical: bool = False,
     icon: QIcon | QPixmap | None = None,
+    ok_text: str = "OK",
 ) -> None:
-    MessageDialog(title, message, parent, critical=critical, icon=icon).exec()
+    MessageDialog(title, message, parent, critical=critical, icon=icon, ok_text=ok_text).exec()
 
 
 @dataclass(frozen=True)
