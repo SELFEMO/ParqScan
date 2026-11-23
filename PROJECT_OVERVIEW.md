@@ -62,6 +62,10 @@ ParqScan 使用 Python、PySide6 与 PyArrow，在不把完整大文件物化到
 
 顶层菜单与下拉必须用蒙版裁切圆角（QSS `border-radius` 不够）。`RoundedMenu`、`RoundedComboBox`、`RoundedTableView`、`MessageDialog`、`SearchField`、`PaginationBar` 承担真实裁切、无原生长 Tooltip、图标分页。
 
+### 6. 检查更新
+
+`UpdateController` 持有后台检查与下载 Worker 的强引用，通过三参数 `Signal(object, bool, int)` 直连主线程 `@Slot`（`QueuedConnection`），并结合代次编号与 10 秒请求超时避免线程卡死；主窗口复用唯一可取消的进度框，避免自动检查与手动触发弹出双窗口。
+
 ## 三、目录与文件职责
 
 ### 根目录

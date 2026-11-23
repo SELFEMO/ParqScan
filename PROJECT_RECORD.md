@@ -2,6 +2,18 @@
 
 按日期记录重要修改及原因。同一天内相关改动已合并，更早条目保持原顺序。
 
+## 2026-11-23 — v0.3.6：检查更新并发链路修复与单弹窗统一
+
+### 修改内容
+
+- 版本号升至 **0.3.6**，并同步更新站点文档与构建元数据。
+- **修复检查更新永久卡死**：在 `UpdateController` 中保留 `_check_worker` 与 `_download_worker` 的强引用，避免工作线程启动前被 Python GC 销毁；同时将信号连接改回 `UpdateCheckWorker` 三参数信号直连 `UpdateController` 的 `@Slot` 方法（移除不兼容 `QueuedConnection` 的 `lambda` 闭包）。
+- **统一单进度框与可取消交互**：为检查更新进度框补齐「取消」按钮并接入 `cancel_check()` 与 `_check_generation` 代次隔离；自动检查与手动点击并发时复用唯一进度框，消除双弹窗冗余；将 GitHub API 超时由 30 秒调整为 10 秒。
+
+### 设计原因
+
+旧版 `UpdateController` 未保活局部变量 `worker` 且后续曾改用 `lambda` 连接跨线程 `QueuedConnection`，导致回调信号在 PySide6 下无法投递回主线程、无取消按钮的模态进度框永久挂起。v0.3.6 彻底打通检查更新的异步状态闭环。
+
 ## 2026-11-23 — v0.3.5：UI 视觉规范化、并发安全与核心交互全面升级
 
 ### 修改内容
