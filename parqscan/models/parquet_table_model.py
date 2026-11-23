@@ -6,11 +6,13 @@ from typing import Any
 
 import pyarrow as pa
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, QObject, QSize, QThreadPool, Qt, Signal
-from PySide6.QtGui import QBrush, QColor, QPixmap
+from PySide6.QtGui import QColor, QFont, QPixmap
+from PySide6.QtWidgets import QApplication
 
 from parqscan.constants import IMAGE_HOVER_CACHE_LIMIT, PAGE_LOAD_THREADS, THUMBNAIL_CACHE_LIMIT, THUMBNAIL_SIZE
 from parqscan.data.page_loader import PageLoadTask
 from parqscan.data.parquet_document import ParquetDocument
+from parqscan.tokens import get_theme_tokens
 from parqscan.utils.binary import (
     contains_binary_type,
     embedded_binary_candidate,
@@ -57,6 +59,7 @@ class ParquetTableModel(QAbstractTableModel):
         self._page_source_rows: list[int] = []
         self._loading_source_rows: list[int] = []
         self._global_row_order: list[int] | None = None
+        self._global_row_position: dict[int, int] = {}
         self._loading = False
         self._generation = 0
         self._tasks: dict[int, PageLoadTask] = {}
@@ -146,8 +149,6 @@ class ParquetTableModel(QAbstractTableModel):
             return self.document.schema.names[section]
         if section < 0 or section >= self.rowCount():
             return None
-        if self._loading:
-            return str(self.source_row(section) + 1)
         return str(self.source_row(section) + 1)
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlag:
@@ -182,10 +183,7 @@ class ParquetTableModel(QAbstractTableModel):
         if self._global_row_order is None:
             position = source_row
         else:
-            try:
-                position = self._global_row_order.index(source_row)
-            except ValueError:
-                position = source_row
+            position = self._global_row_position.get(source_row, source_row)
         return max(0, min(position // self._page_size, self.total_pages - 1))
 
     def _raw_value(self, view_row: int, column: int) -> Any:
@@ -221,35 +219,59 @@ class ParquetTableModel(QAbstractTableModel):
                 return ""
             return None
 
-        value = self._raw_value(index.row(), index.column())
-        if role == self.RawValueRole:
-            return value
-        if role == self.BinaryPayloadRole:
-            return embedded_binary_payload(value) if binary else None
         if role == self.SourceRowRole:
             return self.source_row(index.row())
         if role == self.IsBinaryRole:
             return binary
         if role == self.LoadingRole:
             return False
-        if role == self.IsImageRole:
-            return binary and self.image_pixmap(index, THUMBNAIL_SIZE) is not None
         if role == self.SearchMatchRole:
             return (self.source_row(index.row()), index.column()) in self._search_match_set
-        if role == Qt.ItemDataRole.DisplayRole:
-            return self._binary_display(value) if binary else display_text(value, 260)
-        if role == Qt.ItemDataRole.DecorationRole and binary:
-            return self.image_pixmap(index, THUMBNAIL_SIZE)
         if role == Qt.ItemDataRole.ToolTipRole:
             # 中文：完整值由双击详情窗口承载，禁用平台原生长文本 Tooltip 可避免黑色方块遮挡表格和暴露未统一的系统样式。
             # English: Full values belong in the double-click detail dialog; disabling native long-text tooltips prevents opaque square panels from covering the table.
             return None
         if role == Qt.ItemDataRole.TextAlignmentRole:
+            if not binary and (
+                pa.types.is_integer(field.type)
+                or pa.types.is_floating(field.type)
+                or pa.types.is_decimal(field.type)
+            ):
+                return int(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             return int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-        if role == Qt.ItemDataRole.SizeHintRole and binary and self.image_pixmap(index, THUMBNAIL_SIZE) is not None:
-            return QSize(THUMBNAIL_SIZE + 16, THUMBNAIL_SIZE + 16)
-        if role == Qt.ItemDataRole.BackgroundRole and (self.source_row(index.row()), index.column()) in self._search_match_set:
-            return QBrush(QColor(30, 144, 255, 70))
+        if role == self.IsImageRole:
+            return binary and self.image_pixmap(index, THUMBNAIL_SIZE) is not None
+        if role == Qt.ItemDataRole.DecorationRole:
+            return self.image_pixmap(index, THUMBNAIL_SIZE) if binary else None
+        if role == Qt.ItemDataRole.SizeHintRole:
+            if binary and self.image_pixmap(index, THUMBNAIL_SIZE) is not None:
+                return QSize(THUMBNAIL_SIZE + 16, THUMBNAIL_SIZE + 16)
+            return None
+        if role not in {
+            self.RawValueRole,
+            self.BinaryPayloadRole,
+            Qt.ItemDataRole.DisplayRole,
+            Qt.ItemDataRole.ForegroundRole,
+            Qt.ItemDataRole.FontRole,
+        }:
+            return None
+
+        value = self._raw_value(index.row(), index.column())
+        if role == self.RawValueRole:
+            return value
+        if role == self.BinaryPayloadRole:
+            return embedded_binary_payload(value) if binary else None
+        if role == Qt.ItemDataRole.DisplayRole:
+            return self._binary_display(value) if binary else display_text(value, 260)
+        if value is None:
+            if role == Qt.ItemDataRole.ForegroundRole:
+                app = QApplication.instance()
+                is_dark = app is not None and app.palette().base().color().lightness() < 128
+                return QColor(get_theme_tokens("dark" if is_dark else "light").null_text)
+            if role == Qt.ItemDataRole.FontRole:
+                font = QFont()
+                font.setItalic(True)
+                return font
         return None
 
     def image_pixmap(self, index: QModelIndex, size: int) -> QPixmap | None:
@@ -282,6 +304,12 @@ class ParquetTableModel(QAbstractTableModel):
         if emit_ready:
             self.image_cell_ready.emit(index.row(), index.column())
         return pixmap
+
+    def row_has_cached_image(self, view_row: int) -> bool:
+        if self._loading or self._table is None or view_row < 0 or view_row >= self.rowCount():
+            return False
+        source_row = self.source_row(view_row)
+        return any((source_row, col, THUMBNAIL_SIZE) in self._pixmap_cache for col in range(self.columnCount()))
 
     def _pixmap_store(self, size: int) -> tuple[OrderedDict[tuple[int, int, int], QPixmap], int, bool]:
         if size <= THUMBNAIL_SIZE:
@@ -421,28 +449,6 @@ class ParquetTableModel(QAbstractTableModel):
                     matches.append((source_row, column))
         return matches
 
-    def sort(self, column: int, order: Qt.SortOrder = Qt.SortOrder.AscendingOrder) -> None:
-        if self._table is None or self._loading or column < 0 or column >= self.columnCount():
-            return
-        offsets = list(self._filtered_offsets) if self._filtered_offsets is not None else self._base_offsets()
-        field_type = self.document.schema.field(column).type
-
-        def sortable(offset: int) -> tuple[bool, Any]:
-            value = self._table.column(column)[offset].as_py()
-            if value is None:
-                return True, ""
-            if pa.types.is_integer(field_type) or pa.types.is_floating(field_type) or pa.types.is_decimal(field_type):
-                return False, value
-            if contains_binary_type(field_type):
-                return False, embedded_binary_payload(value) or b""
-            return False, display_text(value).casefold()
-
-        offsets.sort(key=sortable, reverse=order == Qt.SortOrder.DescendingOrder)
-        self.beginResetModel()
-        self._ordered_offsets = offsets
-        self.endResetModel()
-        self._emit_search_highlight_changed()
-
     def apply_filter(self, column: int, operator: str, query: str) -> None:
         if self._table is None or self._loading:
             return
@@ -512,6 +518,7 @@ class ParquetTableModel(QAbstractTableModel):
         if self._global_row_order is None:
             return
         self._global_row_order = None
+        self._global_row_position.clear()
         self.load_page(0)
 
     @property
@@ -528,6 +535,7 @@ class ParquetTableModel(QAbstractTableModel):
         self._page_source_rows = []
         self._loading_source_rows = []
         self._global_row_order = None
+        self._global_row_position.clear()
         self._pixmap_cache.clear()
         self._hover_cache.clear()
         self._invalid_image_cells.clear()

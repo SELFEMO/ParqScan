@@ -111,6 +111,8 @@ class ParquetDocument:
     ) -> pa.Table:
         """Read one logical page and report real row-group scan progress."""
         selected_schema = self.selected_schema(columns)
+        if self.file is None:
+            return pa.Table.from_batches([], schema=selected_schema)
         if row_count <= 0 or start_row >= self.total_rows:
             if progress:
                 progress(1, 1)
@@ -175,6 +177,8 @@ class ParquetDocument:
     ) -> pa.Table:
         """Read arbitrary source rows while preserving the caller's requested order."""
         selected_schema = self.selected_schema(columns)
+        if self.file is None:
+            return pa.Table.from_batches([], schema=selected_schema)
         valid_rows = [row for row in source_rows if 0 <= row < self.total_rows]
         if not valid_rows:
             if progress:
@@ -304,7 +308,10 @@ class ParquetDocument:
             for column_index in range(row_group.num_columns):
                 column = row_group.column(column_index)
                 physical_path = str(column.path_in_schema)
-                root_name = physical_path.split(".", 1)[0]
+                if physical_path in aggregates:
+                    root_name = physical_path
+                else:
+                    root_name = physical_path.split(".", 1)[0]
                 aggregate = aggregates.get(root_name)
                 if aggregate is None:
                     continue

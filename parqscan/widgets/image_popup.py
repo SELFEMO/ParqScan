@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QEvent, QModelIndex, QObject, QPersistentModelIndex, QPoint, QTimer, Qt
-from PySide6.QtGui import QCursor, QImage, QPixmap
+from PySide6.QtGui import QCursor, QGuiApplication, QImage
 from PySide6.QtWidgets import (
     QApplication,
     QDialog,
@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
 from parqscan.constants import IMAGE_HOVER_SIZE, THUMBNAIL_SIZE
 from parqscan.i18n import Translator
 from parqscan.models.parquet_table_model import ParquetTableModel
-from parqscan.utils.icons import make_icon
+from parqscan.utils.icons import make_themed_icon
 from parqscan.widgets.design_system import CardFrame, ZoomableImageView, _apply_rounded_mask
 
 
@@ -59,6 +59,16 @@ class ImageHoverPreview(QObject):
     def hide_preview(self) -> None:
         self.popup.hide()
         self._last_index = None
+
+    def shutdown(self) -> None:
+        self.hide_preview()
+        viewport = self.table.viewport()
+        if viewport is not None:
+            viewport.removeEventFilter(self)
+        if self._filtered_window is not None:
+            self._filtered_window.removeEventFilter(self)
+            self._filtered_window = None
+        self.popup.deleteLater()
 
     def refresh_from_cursor(self) -> None:
         self._update_from_point(self.table.viewport().mapFromGlobal(QCursor.pos()))
@@ -152,10 +162,26 @@ class ImageHoverPreview(QObject):
         self._place_popup(self.table.viewport().mapFromGlobal(QCursor.pos()))
 
     def _place_popup(self, local: QPoint) -> None:
-        global_point = self.table.viewport().mapToGlobal(local + QPoint(18, 18))
-        screen = self.table.screen().availableGeometry() if self.table.screen() is not None else self.table.rect()
-        x = min(global_point.x(), screen.right() - self.popup.width() - 8)
-        y = min(global_point.y(), screen.bottom() - self.popup.height() - 8)
+        cursor_global = self.table.viewport().mapToGlobal(local)
+        screen_obj = QGuiApplication.screenAt(cursor_global) or self.table.screen() or QGuiApplication.primaryScreen()
+        screen = screen_obj.availableGeometry() if screen_obj is not None else self.table.rect()
+
+        x = cursor_global.x() + 18
+        if x + self.popup.width() > screen.right() - 8:
+            flipped_x = cursor_global.x() - self.popup.width() - 18
+            if flipped_x >= screen.left() + 8:
+                x = flipped_x
+            else:
+                x = screen.right() - self.popup.width() - 8
+
+        y = cursor_global.y() + 18
+        if y + self.popup.height() > screen.bottom() - 8:
+            flipped_y = cursor_global.y() - self.popup.height() - 18
+            if flipped_y >= screen.top() + 8:
+                y = flipped_y
+            else:
+                y = screen.bottom() - self.popup.height() - 8
+
         self.popup.move(max(screen.left() + 8, x), max(screen.top() + 8, y))
         _apply_rounded_mask(self.popup, 12)
 
@@ -186,17 +212,14 @@ class ImagePreviewDialog(QDialog):
         controls.addStretch(1)
         self.zoom_out_button = QPushButton()
         self.zoom_out_button.setProperty("secondary", True)
-        self.zoom_out_button.setIcon(make_icon("zoom_out", "#0F6FDB"))
         self.zoom_level_label = QLabel("100%")
         self.zoom_level_label.setObjectName("Chip")
         self.zoom_level_label.setMinimumWidth(54)
         self.zoom_level_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.zoom_in_button = QPushButton()
         self.zoom_in_button.setProperty("secondary", True)
-        self.zoom_in_button.setIcon(make_icon("zoom_in", "#0F6FDB"))
         self.reset_view_button = QPushButton()
         self.reset_view_button.setProperty("secondary", True)
-        self.reset_view_button.setIcon(make_icon("reset_view", "#0F6FDB"))
         controls.addWidget(self.zoom_out_button)
         controls.addWidget(self.zoom_level_label)
         controls.addWidget(self.zoom_in_button)
@@ -216,8 +239,27 @@ class ImagePreviewDialog(QDialog):
         layout.addLayout(controls)
         layout.addWidget(self.image_view, 1)
         self.resize(980, 720)
+        self.refresh_theme()
         self.translator.language_changed.connect(self.retranslate)
         self.retranslate()
+
+    def refresh_theme(self) -> None:
+        theme = "dark" if self.palette().color(self.backgroundRole()).lightness() < 128 else "light"
+        self.zoom_out_button.setIcon(make_themed_icon("zoom_out", theme, "accent", 18))
+        self.zoom_in_button.setIcon(make_themed_icon("zoom_in", theme, "accent", 18))
+        self.reset_view_button.setIcon(make_themed_icon("reset_view", theme, "accent", 18))
+
+    def changeEvent(self, event: QEvent) -> None:  # noqa: N802 - Qt naming convention
+        super().changeEvent(event)
+        if event.type() in {QEvent.Type.PaletteChange, QEvent.Type.StyleChange}:
+            self.refresh_theme()
+
+    def closeEvent(self, event) -> None:  # noqa: N802 - Qt naming convention
+        try:
+            self.translator.language_changed.disconnect(self.retranslate)
+        except (RuntimeError, TypeError):
+            pass
+        super().closeEvent(event)
 
     def retranslate(self) -> None:
         self.setWindowTitle(self.translator.tr("images.preview_title"))

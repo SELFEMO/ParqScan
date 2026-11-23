@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pyarrow as pa
+import pyarrow.compute as pc
 from PySide6.QtCore import QObject, Signal, Slot
 
 from parqscan.constants import EXPORT_BATCH_ROWS
@@ -16,6 +18,26 @@ from parqscan.utils.binary import (
 )
 from parqscan.utils.search import searchable_text
 from parqscan.utils.serialization import display_text
+
+MAX_GLOBAL_SEARCH_MATCHES = 50_000
+_UNSAFE_FILENAME_RE = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+
+
+def safe_extract_output_path(target_dir: Path, name_hint: str | None, row_number: int, ext: str) -> Path:
+    base_target = target_dir.resolve()
+    raw_name = Path(name_hint).name if name_hint else ""
+    cleaned = _UNSAFE_FILENAME_RE.sub("_", raw_name).strip().strip(".")
+    if not cleaned or cleaned in {".", ".."}:
+        cleaned = f"row_{row_number}.{ext}"
+    output = (base_target / cleaned)
+    if not output.suffix:
+        output = output.with_suffix(f".{ext}")
+    if output.exists():
+        output = base_target / f"row_{row_number}_{output.name}"
+    resolved = output.resolve()
+    if not resolved.is_relative_to(base_target):
+        raise ValueError(f"Unsafe image output path: {output}")
+    return resolved
 
 
 class CancellableWorker(QObject):
@@ -36,32 +58,38 @@ class CancellableWorker(QObject):
 
 
 class ExportWorker(CancellableWorker):
-    def __init__(self, document: ParquetDocument, target: str, export_kind: str) -> None:
+    def __init__(self, document: ParquetDocument | str, target: str, export_kind: str) -> None:
         super().__init__()
-        self.document = document
+        self.path = document.path if isinstance(document, ParquetDocument) else str(document)
         self.target = target
         self.export_kind = export_kind
 
     @Slot()
     def run(self) -> None:
+        doc: ParquetDocument | None = None
         try:
-            EXPORT_HANDLERS[self.export_kind](self.document, self.target, self.progress.emit, self.is_cancelled)
+            doc = ParquetDocument(self.path)
+            EXPORT_HANDLERS[self.export_kind](doc, self.target, self.progress.emit, self.is_cancelled)
             self.finished.emit(self.target if not self.is_cancelled() else None)
         except Exception as error:
-            self.failed.emit(str(error))
+            if not self.is_cancelled():
+                self.failed.emit(str(error))
+        finally:
+            if doc is not None:
+                doc.close()
 
 
 class FragmentExportWorker(CancellableWorker):
     def __init__(
         self,
-        document: ParquetDocument,
+        document: ParquetDocument | str,
         target: str,
         start_row: int,
         end_row: int,
         columns: list[str],
     ) -> None:
         super().__init__()
-        self.document = document
+        self.path = document.path if isinstance(document, ParquetDocument) else str(document)
         self.target = target
         self.start_row = start_row
         self.end_row = end_row
@@ -69,9 +97,11 @@ class FragmentExportWorker(CancellableWorker):
 
     @Slot()
     def run(self) -> None:
+        doc: ParquetDocument | None = None
         try:
+            doc = ParquetDocument(self.path)
             export_parquet_fragment(
-                self.document,
+                doc,
                 self.target,
                 self.start_row,
                 self.end_row,
@@ -81,13 +111,17 @@ class FragmentExportWorker(CancellableWorker):
             )
             self.finished.emit(self.target if not self.is_cancelled() else None)
         except Exception as error:
-            self.failed.emit(str(error))
+            if not self.is_cancelled():
+                self.failed.emit(str(error))
+        finally:
+            if doc is not None:
+                doc.close()
 
 
 class ImageExtractWorker(CancellableWorker):
-    def __init__(self, document: ParquetDocument, column_name: str, target_directory: str) -> None:
+    def __init__(self, document: ParquetDocument | str, column_name: str, target_directory: str) -> None:
         super().__init__()
-        self.document = document
+        self.path = document.path if isinstance(document, ParquetDocument) else str(document)
         self.column_name = column_name
         self.target_directory = target_directory
 
@@ -95,10 +129,13 @@ class ImageExtractWorker(CancellableWorker):
     def run(self) -> None:
         exported = 0
         processed = 0
+        doc: ParquetDocument | None = None
         try:
+            doc = ParquetDocument(self.path)
             target = Path(self.target_directory)
             target.mkdir(parents=True, exist_ok=True)
-            for batch in self.document.iter_batches_from(0, EXPORT_BATCH_ROWS, columns=[self.column_name]):
+            last_percent = -1
+            for batch in doc.iter_batches_from(0, EXPORT_BATCH_ROWS, columns=[self.column_name]):
                 if self.is_cancelled():
                     break
                 for value in batch.column(0):
@@ -109,61 +146,105 @@ class ImageExtractWorker(CancellableWorker):
                     if image is not None:
                         row_number = processed + 1
                         name_hint = embedded_file_name_hint(raw_value)
-                        output = target / (name_hint or f"row_{row_number}.{image.image_format.extension}")
-                        if not output.suffix:
-                            output = output.with_suffix(f".{image.image_format.extension}")
-                        if output.exists():
-                            output = target / f"row_{row_number}_{output.name}"
+                        output = safe_extract_output_path(target, name_hint, row_number, image.image_format.extension)
                         output.write_bytes(image.data)
                         exported += 1
                     processed += 1
-                self.progress.emit(processed, self.document.total_rows)
-            self.finished.emit(exported)
+                percent = 100 if doc.total_rows <= 0 else min(100, (processed * 100) // doc.total_rows)
+                if percent != last_percent or processed >= doc.total_rows:
+                    last_percent = percent
+                    self.progress.emit(processed, doc.total_rows)
+            self.finished.emit(exported if not self.is_cancelled() else None)
         except Exception as error:
-            self.failed.emit(str(error))
+            if not self.is_cancelled():
+                self.failed.emit(str(error))
+        finally:
+            if doc is not None:
+                doc.close()
 
 
 class GlobalSearchWorker(CancellableWorker):
-    def __init__(self, document: ParquetDocument, query: str) -> None:
+    def __init__(self, document: ParquetDocument | str, query: str) -> None:
         super().__init__()
-        self.document = document
+        self.path = document.path if isinstance(document, ParquetDocument) else str(document)
         self.query = query.strip().casefold()
 
     @Slot()
     def run(self) -> None:
         matches: list[tuple[int, int]] = []
         processed = 0
+        doc: ParquetDocument | None = None
         try:
             if not self.query:
                 self.finished.emit(matches)
                 return
-            # 中文：搜索按批次扫描整个文件并只保存坐标，避免为了全局搜索把完整 Parquet 数据常驻内存。
-            # English: Search scans the whole file in batches and retains only coordinates, avoiding a full in-memory copy of the Parquet data.
-            for batch in self.document.iter_batches_from(0, EXPORT_BATCH_ROWS):
-                if self.is_cancelled():
+            doc = ParquetDocument(self.path)
+            last_percent = -1
+            # 中文：搜索按批次扫描整个文件并限制最大命中数，同时对纯字符串列走 Arrow 向量化预筛。
+            # English: Search scans the file in batches with a match cap and vectorized Arrow pre-filtering for string columns.
+            for batch in doc.iter_batches_from(0, EXPORT_BATCH_ROWS):
+                if self.is_cancelled() or len(matches) >= MAX_GLOBAL_SEARCH_MATCHES:
                     break
-                for local_row in range(batch.num_rows):
-                    if self.is_cancelled():
+                for column in range(batch.num_columns):
+                    if self.is_cancelled() or len(matches) >= MAX_GLOBAL_SEARCH_MATCHES:
                         break
-                    source_row = processed + local_row
-                    for column in range(batch.num_columns):
-                        value = batch.column(column)[local_row].as_py()
-                        field_type = self.document.schema.field(column).type
-                        if self.query in searchable_text(value, field_type).casefold():
-                            matches.append((source_row, column))
+                    field_type = doc.schema.field(column).type
+                    col_array = batch.column(column)
+                    if pa.types.is_string(field_type) or pa.types.is_large_string(field_type):
+                        mask = pc.match_substring(col_array, self.query, ignore_case=True)
+                        indices = pc.indices_nonzero(mask).to_pylist()
+                        for local_row in indices:
+                            matches.append((processed + local_row, column))
+                            if len(matches) >= MAX_GLOBAL_SEARCH_MATCHES:
+                                break
+                    else:
+                        values = col_array.to_pylist()
+                        for local_row, value in enumerate(values):
+                            if self.is_cancelled():
+                                break
+                            if value is not None and self.query in searchable_text(value, field_type).casefold():
+                                matches.append((processed + local_row, column))
+                                if len(matches) >= MAX_GLOBAL_SEARCH_MATCHES:
+                                    break
                 processed += batch.num_rows
-                self.progress.emit(processed, self.document.total_rows)
+                percent = 100 if doc.total_rows <= 0 else min(100, (processed * 100) // doc.total_rows)
+                if percent != last_percent or processed >= doc.total_rows:
+                    last_percent = percent
+                    self.progress.emit(processed, doc.total_rows)
+            if not self.is_cancelled():
+                matches.sort(key=lambda item: (item[0], item[1]))
             self.finished.emit(matches if not self.is_cancelled() else None)
         except Exception as error:
-            self.failed.emit(str(error))
+            if not self.is_cancelled():
+                self.failed.emit(str(error))
+        finally:
+            if doc is not None:
+                doc.close()
 
 
 class GlobalSortWorker(CancellableWorker):
-    def __init__(self, document: ParquetDocument, column: int, descending: bool) -> None:
+    def __init__(self, document: ParquetDocument | str, column: int, descending: bool) -> None:
         super().__init__()
-        self.document = document
+        self.path = document.path if isinstance(document, ParquetDocument) else str(document)
         self.column = column
         self.descending = descending
+
+    @staticmethod
+    def _supports_arrow_sort(field_type: object) -> bool:
+        return (
+            pa.types.is_boolean(field_type)
+            or pa.types.is_integer(field_type)
+            or pa.types.is_floating(field_type)
+            or pa.types.is_decimal(field_type)
+            or pa.types.is_date(field_type)
+            or pa.types.is_time(field_type)
+            or pa.types.is_timestamp(field_type)
+            or pa.types.is_duration(field_type)
+            or pa.types.is_string(field_type)
+            or pa.types.is_large_string(field_type)
+            or pa.types.is_binary(field_type)
+            or pa.types.is_large_binary(field_type)
+        )
 
     @staticmethod
     def _sortable_value(value: object, field_type: object) -> object:
@@ -187,28 +268,48 @@ class GlobalSortWorker(CancellableWorker):
     @Slot()
     def run(self) -> None:
         processed = 0
-        non_null: list[tuple[object, int]] = []
-        null_rows: list[int] = []
+        doc: ParquetDocument | None = None
         try:
-            field = self.document.schema.field(self.column)
+            doc = ParquetDocument(self.path)
+            field = doc.schema.field(self.column)
             column_name = field.name
-            # 中文：文件级排序只扫描目标列并建立原始行号索引，随后分页按索引读取，既保证跨页顺序又不复制整张表。
-            # English: File-level sorting scans only the target column and builds a source-row index; pages then read by that index, preserving cross-page order without copying the full table.
-            for batch in self.document.iter_batches_from(0, EXPORT_BATCH_ROWS, columns=[column_name]):
+            if self._supports_arrow_sort(field.type):
+                chunks: list[pa.Array] = []
+                for batch in doc.iter_batches_from(0, EXPORT_BATCH_ROWS, columns=[column_name]):
+                    if self.is_cancelled():
+                        self.finished.emit(None)
+                        return
+                    chunks.append(batch.column(0))
+                    processed += batch.num_rows
+                    self.progress.emit(processed, doc.total_rows)
+                if self.is_cancelled():
+                    self.finished.emit(None)
+                    return
+                if not chunks:
+                    self.finished.emit((self.column, self.descending, []))
+                    return
+                combined = pa.chunked_array(chunks)
+                order = "descending" if self.descending else "ascending"
+                indices = pc.sort_indices(combined, sort_keys=[("", order)], null_placement="at_end")
+                self.finished.emit((self.column, self.descending, indices.to_pylist()))
+                return
+
+            non_null: list[tuple[object, int]] = []
+            null_rows: list[int] = []
+            for batch in doc.iter_batches_from(0, EXPORT_BATCH_ROWS, columns=[column_name]):
                 if self.is_cancelled():
                     break
-                array = batch.column(0)
-                for local_row in range(batch.num_rows):
+                values = batch.column(0).to_pylist()
+                for local_row, value in enumerate(values):
                     if self.is_cancelled():
                         break
                     source_row = processed + local_row
-                    value = array[local_row].as_py()
                     if value is None:
                         null_rows.append(source_row)
                     else:
                         non_null.append((self._sortable_value(value, field.type), source_row))
                 processed += batch.num_rows
-                self.progress.emit(processed, self.document.total_rows)
+                self.progress.emit(processed, doc.total_rows)
             if self.is_cancelled():
                 self.finished.emit(None)
                 return
@@ -217,4 +318,8 @@ class GlobalSortWorker(CancellableWorker):
             row_order.extend(null_rows)
             self.finished.emit((self.column, self.descending, row_order))
         except Exception as error:
-            self.failed.emit(str(error))
+            if not self.is_cancelled():
+                self.failed.emit(str(error))
+        finally:
+            if doc is not None:
+                doc.close()
