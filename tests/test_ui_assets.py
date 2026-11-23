@@ -246,7 +246,7 @@ class UiAssetTests(unittest.TestCase):
         dark = (ROOT / "parqscan" / "styles" / "dark.qss").read_text(encoding="utf-8")
         self.assertIn("QWidget#DetailPreviewGrid {\n    background: #E8EEF6;", light)
         self.assertIn("QFrame#DetailPreviewTile {\n    background: #FFFFFF;\n    border: none;", light)
-        self.assertIn("color: #8B9CB3;", light)
+        self.assertIn("color: #5A6B82;", light)
         self.assertIn("background: #EEF2F7;", light)
         self.assertIn("QFrame#DetailPreviewCard {\n    background: #FFFFFF;", light)
         self.assertIn("QFrame#DetailPreviewTile {\n    background: #141E2B;\n    border: none;", dark)

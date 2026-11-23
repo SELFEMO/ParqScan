@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import string
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QFontDatabase, QTextCursor
+from PySide6.QtCore import QEvent, Qt
+from PySide6.QtGui import QColor, QFontDatabase, QTextCursor, QTextFormat
+from PySide6.QtWidgets import QTextEdit
 from PySide6.QtWidgets import (
     QDialog,
     QHBoxLayout,
@@ -18,7 +19,8 @@ from PySide6.QtWidgets import (
 from parqscan.constants import HEX_BYTES_PER_LINE
 from parqscan.i18n import Translator
 from parqscan.utils.binary import format_size, hex_dump
-from parqscan.utils.icons import make_icon
+from parqscan.tokens import get_theme_tokens
+from parqscan.utils.icons import make_themed_icon
 from parqscan.widgets.design_system import (
     CardFrame,
     ElidingLabel,
@@ -40,9 +42,13 @@ class HexPreviewWidget(QWidget):
         self.translator = translator
         self._data = b""
         self._label = ""
+        self._window_size = 64 * 1024
+        self._window_start = 0
         self._matches: list[tuple[int, int]] = []
         self._match_cursor = -1
         self._search_signature: tuple[str, str] | None = None
+        self._search_state = "idle"
+        self._out_of_range_offset = 0
 
         self.mode_chip = QLabel("HEX + ASCII")
         self.mode_chip.setObjectName("Chip")
@@ -59,7 +65,7 @@ class HexPreviewWidget(QWidget):
         self.search_edit = self.search_field.editor
         self.search_button = QPushButton()
         self.search_button.setProperty("primary", True)
-        self.search_button.setIcon(make_icon("search", "#FFFFFF", 16))
+        self.search_button.setProperty("iconName", "search")
         self.search_button.setMinimumWidth(82)
         self.previous_button = self._nav_button("left")
         self.next_button = self._nav_button("right")
@@ -117,6 +123,7 @@ class HexPreviewWidget(QWidget):
         self.search_button.clicked.connect(self.execute_search)
         self.previous_button.clicked.connect(self.find_previous)
         self.next_button.clicked.connect(self.find_next)
+        self.refresh_theme()
         self.translator.language_changed.connect(self.retranslate)
         self.retranslate()
         self._set_has_data(False)
@@ -124,23 +131,71 @@ class HexPreviewWidget(QWidget):
     @staticmethod
     def _nav_button(icon_name: str) -> QPushButton:
         button = QPushButton()
-        button.setProperty("hexNav", True)
-        button.setIcon(make_icon(icon_name))
+        button.setProperty("secondary", True)
+        button.setProperty("iconName", icon_name)
         button.setMinimumWidth(88)
         button.setFixedHeight(34)
         return button
 
+    def refresh_theme(self) -> None:
+        theme = "dark" if self.palette().color(self.backgroundRole()).lightness() < 128 else "light"
+        self.search_button.setIcon(make_themed_icon("search", theme, "on_primary", 16))
+        self.previous_button.setIcon(make_themed_icon("left", theme, "accent", 16))
+        self.next_button.setIcon(make_themed_icon("right", theme, "accent", 16))
+        if self._matches and self._match_cursor >= 0:
+            offset, length = self._matches[self._match_cursor]
+            self._select_offset(offset, length)
+
+    def changeEvent(self, event: QEvent) -> None:  # noqa: N802 - Qt naming convention
+        super().changeEvent(event)
+        if event.type() in {QEvent.Type.PaletteChange, QEvent.Type.StyleChange}:
+            self.refresh_theme()
+
     def set_data(self, data: bytes, label: str = "") -> None:
         self._data = data
         self._label = label
-        self.editor.setPlainText(hex_dump(data))
-        self.info_label.setText(f"{label} · {format_size(len(data))}" if label else format_size(len(data)))
+        self._window_start = 0
+        self._render_window(0)
         self.editor.moveCursor(QTextCursor.MoveOperation.Start)
         self._matches.clear()
         self._match_cursor = -1
         self._search_signature = None
         self._set_has_data(True)
         self._mark_search_dirty()
+
+    def set_label(self, label: str) -> None:
+        self._label = label
+        self._update_info_label()
+
+    def _update_info_label(self) -> None:
+        if not self._data:
+            self.info_label.setText(self.translator.tr("hex.empty_title"))
+            return
+        size_text = format_size(len(self._data))
+        base = f"{self._label} · {size_text}" if self._label else size_text
+        if len(self._data) > self._window_size:
+            notice = self.translator.tr("hex.window_notice", offset=self._window_start, total=size_text)
+            self.info_label.setText(f"{base} · {notice}")
+        else:
+            self.info_label.setText(base)
+
+    def _render_window(self, window_start: int) -> None:
+        aligned = max(0, (window_start // HEX_BYTES_PER_LINE) * HEX_BYTES_PER_LINE)
+        if aligned >= len(self._data) and self._data:
+            aligned = max(0, ((len(self._data) - 1) // self._window_size) * self._window_size)
+        self._window_start = aligned
+        chunk = self._data[aligned : aligned + self._window_size]
+        if aligned == 0:
+            self.editor.setPlainText(hex_dump(chunk))
+        else:
+            lines = []
+            for rel in range(0, len(chunk), HEX_BYTES_PER_LINE):
+                row_bytes = chunk[rel : rel + HEX_BYTES_PER_LINE]
+                hex_part = " ".join(f"{b:02X}" for b in row_bytes)
+                ascii_part = "".join(chr(b) if 32 <= b < 127 else "." for b in row_bytes)
+                lines.append(f"{aligned + rel:08X}  {hex_part:<{HEX_BYTES_PER_LINE * 3 - 1}}  {ascii_part}")
+            self.editor.setPlainText("\n".join(lines))
+        self._update_info_label()
 
     def clear_data(self) -> None:
         self._data = b""
@@ -175,9 +230,11 @@ class HexPreviewWidget(QWidget):
         if not self._data:
             self.search_status_label.clear()
         elif self.search_edit.text().strip():
-            self.search_status_label.setText(self.translator.tr("hex.search_ready"))
+            self._search_state = "ready"
+            self._refresh_search_status()
         else:
-            self.search_status_label.setText(self.translator.tr("hex.search_idle"))
+            self._search_state = "idle"
+            self._refresh_search_status()
 
     @staticmethod
     def _decode_hex_query(query: str) -> bytes | None:
@@ -230,6 +287,7 @@ class HexPreviewWidget(QWidget):
         except ValueError:
             return None
         if offset < 0 or offset >= len(self._data):
+            self._out_of_range_offset = offset
             return []
         return [(offset, 1)]
 
@@ -267,9 +325,11 @@ class HexPreviewWidget(QWidget):
                 self._matches = self._all_occurrences(self._data, pattern, case_insensitive=True)
 
         if invalid:
-            self.search_status_label.setText(self.translator.tr("hex.invalid_query"))
+            self._search_state = "invalid"
+            self._refresh_search_status()
         elif not self._matches:
-            self.search_status_label.setText(self.translator.tr("hex.no_match"))
+            self._search_state = "no_match"
+            self._refresh_search_status()
         else:
             self._match_cursor = 0
             self._select_current_match()
@@ -286,35 +346,96 @@ class HexPreviewWidget(QWidget):
         self.previous_button.setEnabled(enabled)
         self.next_button.setEnabled(enabled)
 
+    @staticmethod
+    def _parse_offset_value(query: str) -> int | None:
+        compact = query.strip().lower()
+        if not compact:
+            return None
+        try:
+            return int(compact, 16) if compact.startswith("0x") else int(compact, 10)
+        except ValueError:
+            return None
+
+    def _refresh_search_status(self) -> None:
+        if self._search_state == "idle":
+            self.search_status_label.setText(self.translator.tr("hex.search_idle"))
+        elif self._search_state == "ready":
+            self.search_status_label.setText(self.translator.tr("hex.search_ready"))
+        elif self._search_state == "invalid":
+            self.search_status_label.setText(self.translator.tr("hex.invalid_query"))
+        elif self._search_state == "out_of_range":
+            self.search_status_label.setText(
+                self.translator.tr(
+                    "hex.offset_out_of_range",
+                    offset=self._out_of_range_offset,
+                    total=f"{len(self._data):,}",
+                )
+            )
+        elif self._search_state == "no_match":
+            self.search_status_label.setText(self.translator.tr("hex.no_match"))
+        elif self._search_state == "matched" and self._matches and self._match_cursor >= 0:
+            offset, _length = self._matches[self._match_cursor]
+            self.search_status_label.setText(
+                self.translator.tr(
+                    "hex.match_summary",
+                    current=self._match_cursor + 1,
+                    total=len(self._matches),
+                    offset=f"0x{offset:08X}",
+                )
+            )
+
     def _select_current_match(self) -> None:
         if not self._matches or self._match_cursor < 0:
             return
         offset, length = self._matches[self._match_cursor]
         self._select_offset(offset, length)
-        self.search_status_label.setText(
-            self.translator.tr(
-                "hex.match_summary",
-                current=self._match_cursor + 1,
-                total=len(self._matches),
-                offset=f"0x{offset:08X}",
-            )
-        )
+        self._search_state = "matched"
+        self._refresh_search_status()
 
     def _select_offset(self, offset: int, length: int) -> None:
-        line_index = offset // HEX_BYTES_PER_LINE
-        byte_index = offset % HEX_BYTES_PER_LINE
-        block = self.editor.document().findBlockByNumber(line_index)
-        if not block.isValid():
-            return
+        if offset < self._window_start or offset >= self._window_start + self._window_size:
+            window_idx = offset // self._window_size
+            self._render_window(window_idx * self._window_size)
 
-        bytes_in_line = min(length, HEX_BYTES_PER_LINE - byte_index)
-        start = block.position() + 10 + byte_index * 3
-        selection_length = max(2, bytes_in_line * 3 - 1)
-        cursor = QTextCursor(self.editor.document())
-        cursor.setPosition(start)
-        cursor.setPosition(start + selection_length, QTextCursor.MoveMode.KeepAnchor)
-        self.editor.setTextCursor(cursor)
-        self.editor.ensureCursorVisible()
+        theme = "dark" if self.palette().color(self.backgroundRole()).lightness() < 128 else "light"
+        tokens = get_theme_tokens(theme)
+        highlight = QColor(tokens.search_current_bg)
+        highlight.setAlpha(96)
+
+        selections: list[QTextEdit.ExtraSelection] = []
+        remaining = max(1, length)
+        cur_offset = offset
+        first_cursor: QTextCursor | None = None
+        while remaining > 0 and cur_offset < self._window_start + self._window_size:
+            rel_offset = cur_offset - self._window_start
+            line_index = rel_offset // HEX_BYTES_PER_LINE
+            byte_index = rel_offset % HEX_BYTES_PER_LINE
+            block = self.editor.document().findBlockByNumber(line_index)
+            if not block.isValid():
+                break
+            line_text = block.text()
+            sep_pos = line_text.find("  ")
+            hex_col_start = (sep_pos + 2) if sep_pos >= 0 else 10
+            bytes_in_line = min(remaining, HEX_BYTES_PER_LINE - byte_index)
+            start = block.position() + hex_col_start + byte_index * 3
+            selection_length = max(2, bytes_in_line * 3 - 1)
+
+            sel_cursor = QTextCursor(self.editor.document())
+            sel_cursor.setPosition(start)
+            sel_cursor.setPosition(min(block.position() + len(line_text), start + selection_length), QTextCursor.MoveMode.KeepAnchor)
+            extra = QTextEdit.ExtraSelection()
+            extra.cursor = sel_cursor
+            extra.format.setBackground(highlight)
+            selections.append(extra)
+            if first_cursor is None:
+                first_cursor = sel_cursor
+            remaining -= bytes_in_line
+            cur_offset += bytes_in_line
+
+        self.editor.setExtraSelections(selections)
+        if first_cursor is not None:
+            self.editor.setTextCursor(first_cursor)
+            self.editor.ensureCursorVisible()
 
     def find_next(self) -> None:
         if not self._ensure_current_search():
@@ -352,7 +473,8 @@ class HexPreviewWidget(QWidget):
         if not self._data:
             self.info_label.setText(self.translator.tr("hex.empty_title"))
         elif not self.search_edit.text().strip():
-            self.search_status_label.setText(self.translator.tr("hex.search_idle"))
+            self._search_state = "idle"
+            self._refresh_search_status()
 
         self.previous_button.setText(self.translator.tr("common.previous"))
         self.next_button.setText(self.translator.tr("common.next"))
@@ -372,6 +494,14 @@ class HexDialog(QDialog):
         self.resize(980, 700)
         self.translator.language_changed.connect(self.retranslate)
         self.retranslate()
+
+    def closeEvent(self, event) -> None:  # noqa: N802 - Qt naming convention
+        try:
+            self.translator.language_changed.disconnect(self.retranslate)
+            self.translator.language_changed.disconnect(self.preview.retranslate)
+        except (RuntimeError, TypeError):
+            pass
+        super().closeEvent(event)
 
     def retranslate(self) -> None:
         self.setWindowTitle(self.translator.tr("hex.window_title"))

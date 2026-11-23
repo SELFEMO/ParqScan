@@ -8,6 +8,7 @@ from PySide6.QtCore import QEvent, QPoint, QRect, QRectF, QSize, QTimer, Qt
 from PySide6.QtGui import (
     QAction,
     QColor,
+    QPalette,
     QGuiApplication,
     QKeySequence,
     QPainter,
@@ -50,7 +51,8 @@ from parqscan.utils.binary import (
     format_size,
     to_base64,
 )
-from parqscan.utils.icons import make_icon
+from parqscan.tokens import get_theme_tokens
+from parqscan.utils.icons import make_themed_icon
 from parqscan.utils.qt_images import decode_image_bytes
 from parqscan.utils.serialization import json_safe, pretty_text
 from parqscan.widgets.design_system import (
@@ -90,7 +92,9 @@ class DockGripWidget(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(QColor("#718096"))
+        grip_color = self.palette().color(QPalette.ColorRole.WindowText)
+        grip_color.setAlpha(135)
+        painter.setBrush(grip_color)
         center_y = self.height() // 2
         for center_x in (6, 12, 18):
             painter.drawEllipse(QPoint(center_x, center_y), 1, 1)
@@ -163,6 +167,18 @@ class DockTitleBar(QFrame):
             event.accept()
             return
         super().mouseReleaseEvent(event)
+
+    def hideEvent(self, event) -> None:  # noqa: N802 - Qt naming convention
+        if self.mouseGrabber() is self:
+            self.releaseMouse()
+        self._press_position = None
+        self._dragging = False
+        super().hideEvent(event)
+
+    def focusOutEvent(self, event) -> None:  # noqa: N802 - Qt naming convention
+        if self.mouseGrabber() is self:
+            self.releaseMouse()
+        super().focusOutEvent(event)
 
 
 class TileResizeHandle(QWidget):
@@ -380,6 +396,27 @@ class AdaptivePreviewGrid(QWidget):
         if tile is not None:
             tile.setWindowTitle(title)
 
+    def tile_all_previews(self) -> None:
+        if not self._tiles:
+            return
+        canvas_width = max(480, self.width())
+        columns = max(1, min(len(self._tiles), canvas_width // (self.DEFAULT_TILE_WIDTH + self._spacing)))
+        x_cursor = 0
+        y_cursor = 0
+        row_height = 0
+        for idx, tile in enumerate(self._tiles.values()):
+            size = self._sizes.get(tile.widget_id(), QSize(self.DEFAULT_TILE_WIDTH, self.DEFAULT_TILE_HEIGHT))
+            if idx > 0 and idx % columns == 0:
+                x_cursor = 0
+                y_cursor += row_height + self._spacing
+                row_height = 0
+            pos = QPoint(x_cursor, y_cursor)
+            self._positions[tile.widget_id()] = pos
+            tile.move(pos)
+            x_cursor += size.width() + self._spacing
+            row_height = max(row_height, size.height())
+        self._refresh_canvas_bounds()
+
     def reveal_preview(self, widget: QWidget) -> None:
         tile = self._docks.get(widget)
         if tile is not None:
@@ -564,13 +601,10 @@ class FieldPreviewPane(CardFrame):
         self.image_info_label.setObjectName("MutedLabel")
         self.zoom_out_button = QPushButton()
         self.zoom_out_button.setProperty("secondary", True)
-        self.zoom_out_button.setIcon(make_icon("zoom_out", "#0F6FDB"))
         self.zoom_in_button = QPushButton()
         self.zoom_in_button.setProperty("secondary", True)
-        self.zoom_in_button.setIcon(make_icon("zoom_in", "#0F6FDB"))
         self.reset_view_button = QPushButton()
         self.reset_view_button.setProperty("secondary", True)
-        self.reset_view_button.setIcon(make_icon("reset_view", "#0F6FDB"))
         self.zoom_level_label = QLabel("100%")
         self.zoom_level_label.setObjectName("Chip")
         self.zoom_level_label.setMinimumWidth(54)
@@ -597,6 +631,10 @@ class FieldPreviewPane(CardFrame):
         layout.addWidget(self.stack, 1)
 
         self.wrap_button.toggled.connect(self._set_text_wrapping)
+        self.view_preview_button.clicked.connect(lambda: self._switch_view_mode("preview"))
+        self.view_hex_button.clicked.connect(lambda: self._switch_view_mode("hex"))
+        self.view_json_button.clicked.connect(lambda: self._switch_view_mode("json"))
+        self.refresh_theme()
         self.zoom_out_button.clicked.connect(self.image_view.zoom_out)
         self.zoom_in_button.clicked.connect(self.image_view.zoom_in)
         self.reset_view_button.clicked.connect(self.image_view.reset_view)
@@ -612,6 +650,29 @@ class FieldPreviewPane(CardFrame):
     def _update_zoom_level(self, percent: int) -> None:
         self.zoom_level_label.setText(f"{percent}%")
 
+    def refresh_theme(self) -> None:
+        theme = "dark" if self.palette().color(self.backgroundRole()).lightness() < 128 else "light"
+        self.zoom_out_button.setIcon(make_themed_icon("zoom_out", theme, "accent", 18))
+        self.zoom_in_button.setIcon(make_themed_icon("zoom_in", theme, "accent", 18))
+        self.reset_view_button.setIcon(make_themed_icon("reset_view", theme, "accent", 18))
+
+    def changeEvent(self, event: QEvent) -> None:  # noqa: N802 - Qt naming convention
+        super().changeEvent(event)
+        if event.type() in {QEvent.Type.PaletteChange, QEvent.Type.StyleChange}:
+            self.refresh_theme()
+
+    def _switch_view_mode(self, mode: str) -> None:
+        self._view_mode = mode
+        self._render_value()
+
+    def _sync_view_buttons(self, *, has_image: bool, has_binary: bool, active_mode: str) -> None:
+        self.view_preview_button.setVisible(has_image)
+        self.view_hex_button.setVisible(has_binary)
+        self.view_json_button.setVisible(has_image or has_binary)
+        self.view_preview_button.setChecked(active_mode == "preview")
+        self.view_hex_button.setChecked(active_mode == "hex")
+        self.view_json_button.setChecked(active_mode == "json")
+
     def _render_value(self) -> None:
         value = self._value
         field_type = self._field_type
@@ -619,9 +680,20 @@ class FieldPreviewPane(CardFrame):
         self.wrap_button.setVisible(False)
         self.image_view.clear_source()
 
-        image = embedded_image_payload(value) if contains_binary_type(field_type) else None
-        binary = embedded_binary_payload(value) if contains_binary_type(field_type) else None
-        if image is not None:
+        is_bin = contains_binary_type(field_type)
+        image = embedded_image_payload(value) if is_bin else None
+        binary = embedded_binary_payload(value) if is_bin else None
+        has_image = image is not None
+        has_binary = binary is not None
+
+        mode = self._view_mode
+        if mode == "preview" and not has_image:
+            mode = "hex" if has_binary else "json"
+        if mode == "hex" and not has_binary:
+            mode = "json"
+        self._sync_view_buttons(has_image=has_image, has_binary=has_binary, active_mode=mode)
+
+        if mode == "preview" and image is not None:
             decoded = decode_image_bytes(image.data, image.image_format)
             if not decoded.isNull():
                 self.image_view.set_source_image(decoded)
@@ -633,16 +705,20 @@ class FieldPreviewPane(CardFrame):
                 self.size_chip.setText(format_size(len(image.data)))
                 self.stack.setCurrentWidget(self.image_page)
                 return
-        if binary is not None:
+        if mode == "hex" and binary is not None:
             label = f"{self._field_name} · {self.translator.tr('detail.source_row', row=self._source_row + 1)}"
             self.hex_preview.set_data(binary, label)
             self.size_chip.setText(format_size(len(binary)))
             self.stack.setCurrentWidget(self.hex_preview)
             return
 
-        # 中文：普通字段统一经过详情格式化入口，使原生容器和以字符串存储的 JSON 都能按层级完整展开。
-        # English: Normal fields use the shared detail formatter so native containers and JSON stored as text expand by hierarchy.
+        # 中文：普通字段及切换至 JSON 视图时统一经过详情格式化入口，超过 2 MB 时自动截断保护主线程。
+        # English: Normal fields and JSON view share the detail formatter with a 2 MB preview cap to protect the UI thread.
         text = pretty_text(value)
+        max_chars = 2_000_000
+        if len(text) > max_chars:
+            notice = self.translator.tr("detail.truncated_notice")
+            text = text[:max_chars] + f"\n\n--- {notice} ---"
         self.text_editor.setPlainText(text)
         self.text_editor.moveCursor(QTextCursor.MoveOperation.Start)
         self.size_chip.setText(self.translator.tr("detail.characters", count=f"{len(text):,}"))
@@ -667,6 +743,27 @@ class FieldPreviewPane(CardFrame):
             self.stack.setCurrentWidget(self.text_editor)
         elif editor is self.hex_preview.editor:
             self.stack.setCurrentWidget(self.hex_preview)
+
+    def refresh_theme(self) -> None:
+        theme = "dark" if self.palette().color(self.backgroundRole()).lightness() < 128 else "light"
+        self.copy_button.setIcon(make_themed_icon("copy", theme, "accent", 18))
+        self.export_button.setIcon(make_themed_icon("download", theme, "accent", 18))
+        self._refresh_text_highlights()
+
+    def changeEvent(self, event: QEvent) -> None:  # noqa: N802 - Qt naming convention
+        super().changeEvent(event)
+        if event.type() in {QEvent.Type.PaletteChange, QEvent.Type.StyleChange}:
+            self.refresh_theme()
+
+    def closeEvent(self, event) -> None:  # noqa: N802 - Qt naming convention
+        try:
+            self.translator.language_changed.disconnect(self.retranslate)
+        except (RuntimeError, TypeError):
+            pass
+        self._search_debounce_timer.stop()
+        self._highlight_timer.stop()
+        self.deleteLater()
+        super().closeEvent(event)
 
     def retranslate(self) -> None:
         self.row_chip.setText(self.translator.tr("detail.row_chip", row=self._source_row + 1))
@@ -738,14 +835,15 @@ class RecordDetailDialog(QDialog):
         title_layout.addWidget(self.subtitle_label)
         header_layout.addLayout(title_layout, 1)
 
+        self.tile_button = QPushButton()
+        self.tile_button.setProperty("secondary", True)
         self.copy_button = QPushButton()
         self.copy_button.setProperty("secondary", True)
-        self.copy_button.setIcon(make_icon("copy", "#0F6FDB"))
         self.export_button = QPushButton()
         self.export_button.setProperty("secondary", True)
-        self.export_button.setIcon(make_icon("download", "#0F6FDB"))
         self.close_button = QPushButton()
         self.close_button.setProperty("primary", True)
+        header_layout.addWidget(self.tile_button)
         header_layout.addWidget(self.copy_button)
         header_layout.addWidget(self.export_button)
         header_layout.addWidget(self.close_button)
@@ -853,7 +951,14 @@ class RecordDetailDialog(QDialog):
         self.export_button.clicked.connect(self._export_current)
         self.close_button.clicked.connect(self.accept)
         self.tabs.currentChanged.connect(self._tab_changed)
-        self.detail_search_edit.textChanged.connect(self._update_detail_search)
+        self._search_debounce_timer = QTimer(self)
+        self._search_debounce_timer.setSingleShot(True)
+        self._search_debounce_timer.setInterval(200)
+        self._search_debounce_timer.timeout.connect(
+            lambda: self._update_detail_search(self.detail_search_edit.text())
+        )
+        self.detail_search_edit.textChanged.connect(lambda _text: self._search_debounce_timer.start())
+        self.tile_button.clicked.connect(self.preview_grid.tile_all_previews)
         self.detail_search_previous.clicked.connect(lambda: self._navigate_detail_search(-1))
         self.detail_search_next.clicked.connect(lambda: self._navigate_detail_search(1))
         self.detail_search_close.clicked.connect(self._hide_detail_search)
@@ -863,6 +968,7 @@ class RecordDetailDialog(QDialog):
 
         self.field_list.setCurrentRow(max(0, min(initial_column, self.field_list.count() - 1)))
         self.resize(1120, 760)
+        self.refresh_theme()
         self.retranslate()
 
     def _field_value(self, column: int) -> object:
@@ -975,8 +1081,9 @@ class RecordDetailDialog(QDialog):
         selections: list[QTextEdit.ExtraSelection] = []
         search_cursor = QTextCursor(editor.document())
         match_format = QTextCharFormat()
-        highlight_color = QColor("#1E90FF")
-        highlight_color.setAlpha(92)
+        theme = "dark" if self.palette().color(self.backgroundRole()).lightness() < 128 else "light"
+        highlight_color = QColor(get_theme_tokens(theme).selection_highlight)
+        highlight_color.setAlpha(86)
         match_format.setBackground(highlight_color)
 
         while len(selections) < MAX_SELECTION_HIGHLIGHTS:
@@ -1008,8 +1115,10 @@ class RecordDetailDialog(QDialog):
             cursor.setPosition(match.start)
             cursor.setPosition(match.end, QTextCursor.MoveMode.KeepAnchor)
             selection = QTextEdit.ExtraSelection()
-            color = QColor("#1E90FF")
-            color.setAlpha(155 if index == self._search_cursor else 86)
+            theme = "dark" if self.palette().color(self.backgroundRole()).lightness() < 128 else "light"
+            tokens = get_theme_tokens(theme)
+            color = QColor(tokens.search_current_bg if index == self._search_cursor else tokens.search_match_bg)
+            color.setAlpha(140 if index == self._search_cursor else 72)
             selection.format.setBackground(color)
             selection.cursor = cursor
             selections.append(selection)
@@ -1083,7 +1192,7 @@ class RecordDetailDialog(QDialog):
             self._search_matches = self._collect_detail_search_matches(self._search_query)
             if self._search_matches:
                 self._search_cursor = 0
-                self._reveal_detail_search_match()
+                self._reveal_detail_search_match(focus_editor=False)
         self._refresh_text_highlights()
         self._update_detail_search_status()
 
@@ -1094,11 +1203,11 @@ class RecordDetailDialog(QDialog):
             self._update_detail_search_status()
             return
         self._search_cursor = (self._search_cursor + direction) % len(self._search_matches)
-        self._reveal_detail_search_match()
+        self._reveal_detail_search_match(focus_editor=False)
         self._refresh_text_highlights()
         self._update_detail_search_status()
 
-    def _reveal_detail_search_match(self) -> None:
+    def _reveal_detail_search_match(self, *, focus_editor: bool = True) -> None:
         if not (0 <= self._search_cursor < len(self._search_matches)):
             return
         match = self._search_matches[self._search_cursor]
@@ -1120,7 +1229,8 @@ class RecordDetailDialog(QDialog):
         cursor.setPosition(match.end, QTextCursor.MoveMode.KeepAnchor)
         editor.setTextCursor(cursor)
         editor.ensureCursorVisible()
-        editor.setFocus()
+        if focus_editor:
+            editor.setFocus()
 
     def _update_detail_search_status(self) -> None:
         if not self._search_query:
@@ -1154,6 +1264,10 @@ class RecordDetailDialog(QDialog):
         QTimer.singleShot(0, self._refresh_selection_highlights)
 
     def _copy_current(self) -> None:
+        if self.tabs.currentWidget() is self.row_page:
+            self._ensure_row_json_generated()
+            QGuiApplication.clipboard().setText(self.row_editor.toPlainText())
+            return
         value = self._field_value(self.current_column)
         image = embedded_image_payload(value)
         binary = embedded_binary_payload(value)
@@ -1182,6 +1296,27 @@ class RecordDetailDialog(QDialog):
         except OSError as error:
             show_message(self, self.translator.tr("common.error"), str(error), critical=True)
 
+    def refresh_theme(self) -> None:
+        theme = "dark" if self.palette().color(self.backgroundRole()).lightness() < 128 else "light"
+        self.copy_button.setIcon(make_themed_icon("copy", theme, "accent", 18))
+        self.export_button.setIcon(make_themed_icon("download", theme, "accent", 18))
+        self._refresh_text_highlights()
+
+    def changeEvent(self, event: QEvent) -> None:  # noqa: N802 - Qt naming convention
+        super().changeEvent(event)
+        if event.type() in {QEvent.Type.PaletteChange, QEvent.Type.StyleChange}:
+            self.refresh_theme()
+
+    def closeEvent(self, event) -> None:  # noqa: N802 - Qt naming convention
+        try:
+            self.translator.language_changed.disconnect(self.retranslate)
+        except (RuntimeError, TypeError):
+            pass
+        self._search_debounce_timer.stop()
+        self._highlight_timer.stop()
+        self.deleteLater()
+        super().closeEvent(event)
+
     def retranslate(self) -> None:
         source_row = self.source_row + 1
         self.setWindowTitle(self.translator.tr("detail.window_title", row=source_row))
@@ -1189,6 +1324,7 @@ class RecordDetailDialog(QDialog):
         self.subtitle_label.setText(self.model.document.display_name)
         self.fields_caption.setText(self.translator.tr("detail.fields"))
         self.selection_hint.setText(self.translator.tr("detail.multi_select_hint"))
+        self.tile_button.setText(self.translator.tr("detail.tile_grid"))
         self.copy_button.setText(self.translator.tr("detail.copy_value"))
         self.export_button.setText(self.translator.tr("context.export_binary"))
         self.close_button.setText(self.translator.tr("common.close"))

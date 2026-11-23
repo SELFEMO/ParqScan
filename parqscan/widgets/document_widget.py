@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QTabWidget, QVBoxLayout, QWidget
 
 from parqscan.config import ConfigManager
@@ -10,6 +11,10 @@ from parqscan.widgets.metadata_widget import MetadataWidget
 
 
 class DocumentWidget(QWidget):
+    coordinate_changed = Signal(int, int)
+    loaded_rows_changed = Signal(int)
+    status_message = Signal(str)
+
     def __init__(
         self,
         document: ParquetDocument,
@@ -27,6 +32,10 @@ class DocumentWidget(QWidget):
         self.tabs.addTab(self.metadata_widget, "")
         self.tabs.addTab(self.data_widget, "")
 
+        self.data_widget.coordinate_changed.connect(self.coordinate_changed)
+        self.data_widget.loaded_rows_changed.connect(self.loaded_rows_changed)
+        self.metadata_widget.status_message.connect(self.status_message)
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self.tabs)
@@ -36,11 +45,20 @@ class DocumentWidget(QWidget):
         self.translator.language_changed.connect(self.retranslate)
         self.retranslate()
 
+    @property
+    def loaded_rows(self) -> int:
+        return self.data_widget.model.loaded_rows
+
     def focus_search(self) -> None:
         self.tabs.setCurrentWidget(self.data_widget)
         self.data_widget.focus_search()
 
     def shutdown(self) -> None:
+        try:
+            self.translator.language_changed.disconnect(self.retranslate)
+        except (RuntimeError, TypeError):
+            pass
+        self.metadata_widget.shutdown()
         self.data_widget.shutdown()
 
     def retranslate(self) -> None:

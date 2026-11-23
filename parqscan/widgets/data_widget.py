@@ -10,6 +10,7 @@ from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QFileDialog,
+    QComboBox,
     QHeaderView,
     QHBoxLayout,
     QLabel,
@@ -36,10 +37,11 @@ from parqscan.utils.binary import (
     embedded_image_payload,
     to_base64,
 )
-from parqscan.utils.icons import make_icon
+from parqscan.utils.icons import make_themed_icon
 from parqscan.widgets.binary_delegate import BinaryCellDelegate
 from parqscan.widgets.design_system import (
     CardFrame,
+    ElidingLabel,
     HintToolButton,
     LoadingOverlay,
     PaginationBar,
@@ -112,6 +114,7 @@ class DataWidget(QWidget):
         self._search_contexts: dict[object, tuple[int, str, bool, QThread]] = {}
         self._sort_column = -1
         self._sort_order = Qt.SortOrder.AscendingOrder
+        self._pending_sort: tuple[int, Qt.SortOrder] | None = None
         self._active_sort_worker: object | None = None
         self._restoring_columns = False
         self._page_error_shown = False
@@ -122,10 +125,15 @@ class DataWidget(QWidget):
         self.header_eyebrow.setObjectName("EyebrowLabel")
         self.header_title = QLabel()
         self.header_title.setObjectName("PageTitle")
-        heading_layout = QVBoxLayout()
-        heading_layout.setSpacing(3)
-        heading_layout.addWidget(self.header_eyebrow)
-        heading_layout.addWidget(self.header_title)
+        heading_row = QHBoxLayout()
+        heading_row.setContentsMargins(0, 0, 0, 0)
+        heading_row.setSpacing(12)
+        heading_titles = QVBoxLayout()
+        heading_titles.setSpacing(2)
+        heading_titles.addWidget(self.header_eyebrow)
+        heading_titles.addWidget(self.header_title)
+        heading_row.addLayout(heading_titles, 1)
+        heading_row.addWidget(self.extract_images_button, 0, Qt.AlignmentFlag.AlignVCenter)
 
         self.search_scope_combo = RoundedComboBox()
         self.search_scope_combo.setMinimumWidth(132)
@@ -134,8 +142,9 @@ class DataWidget(QWidget):
         self.search_previous_button = self._tool_button("left")
         self.search_next_button = self._tool_button("right")
         self.search_clear_button = self._tool_button("close")
-        self.search_count_label = QLabel()
+        self.search_count_label = ElidingLabel(mode=Qt.TextElideMode.ElideRight)
         self.search_count_label.setObjectName("Chip")
+        self.search_count_label.setMaximumWidth(260)
 
         search_card = CardFrame(object_name="ToolbarCard")
         search_layout = QHBoxLayout(search_card)
@@ -150,7 +159,9 @@ class DataWidget(QWidget):
 
         self.filter_column_combo = RoundedComboBox()
         self.filter_column_combo.addItems(document.schema.names)
-        self.filter_column_combo.setMinimumWidth(130)
+        self.filter_column_combo.setMinimumWidth(116)
+        self.filter_column_combo.setMaximumWidth(220)
+        self.filter_column_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
         self.filter_operator_combo = RoundedComboBox()
         self.filter_operator_combo.setMinimumWidth(92)
         self.filter_value_edit = QLineEdit()
@@ -161,9 +172,12 @@ class DataWidget(QWidget):
         self.sort_clear_button = QPushButton()
         self.sort_clear_button.setProperty("ghost", True)
         self.sort_clear_button.setEnabled(False)
+        self.sort_clear_button.setVisible(False)
         self.extract_images_button = QPushButton()
         self.extract_images_button.setProperty("primary", True)
-        self.extract_images_button.setIcon(make_icon("image", "#FFFFFF"))
+        has_binary_col = any(contains_binary_type(field.type) for field in document.schema)
+        self.extract_images_button.setVisible(has_binary_col)
+        self.extract_images_button.setEnabled(has_binary_col)
 
         filter_card = CardFrame(object_name="ToolbarCard")
         filter_layout = QHBoxLayout(filter_card)
@@ -175,13 +189,24 @@ class DataWidget(QWidget):
         filter_layout.addWidget(self.filter_apply_button)
         filter_layout.addWidget(self.filter_clear_button)
         filter_layout.addWidget(self.sort_clear_button)
-        filter_layout.addStretch(1)
-        filter_layout.addWidget(self.extract_images_button)
 
         self.table_card = CardFrame(object_name="TableCard")
         table_layout = QVBoxLayout(self.table_card)
         table_layout.setContentsMargins(0, 0, 0, 0)
-        table_layout.setSpacing(8)
+        table_layout.setSpacing(0)
+
+        self.empty_banner = QWidget()
+        empty_banner_layout = QHBoxLayout(self.empty_banner)
+        empty_banner_layout.setContentsMargins(14, 10, 14, 10)
+        empty_banner_layout.setSpacing(10)
+        self.empty_banner_label = QLabel()
+        self.empty_banner_label.setObjectName("MutedLabel")
+        self.empty_banner_clear_btn = QPushButton()
+        self.empty_banner_clear_btn.setProperty("secondary", True)
+        self.empty_banner_clear_btn.clicked.connect(self.clear_filter)
+        empty_banner_layout.addWidget(self.empty_banner_label, 1)
+        empty_banner_layout.addWidget(self.empty_banner_clear_btn)
+        self.empty_banner.setVisible(False)
 
         self.table = RoundedTableView()
         self.table.setObjectName("DataTable")
@@ -222,6 +247,7 @@ class DataWidget(QWidget):
         self._configure_table_columns()
         self._restore_column_order()
 
+        table_layout.addWidget(self.empty_banner)
         table_layout.addWidget(self.table, 1)
         self.pagination = PaginationBar(translator, self.model.page_size)
         table_layout.addWidget(self.pagination)
@@ -250,6 +276,8 @@ class DataWidget(QWidget):
         self.search_next_button.clicked.connect(self.search_next)
         self.search_clear_button.clicked.connect(self.search_edit.clear)
         self.filter_apply_button.clicked.connect(self.apply_filter)
+        self.filter_value_edit.returnPressed.connect(self.apply_filter)
+        self.search_edit.returnPressed.connect(self.search_next)
         self.filter_clear_button.clicked.connect(self.clear_filter)
         self.sort_clear_button.clicked.connect(self.clear_file_sort)
         self.extract_images_button.clicked.connect(self.extract_images)
@@ -273,6 +301,7 @@ class DataWidget(QWidget):
         self.model.image_cell_ready.connect(self._image_cell_ready)
         self.translator.language_changed.connect(self.retranslate)
 
+        self.refresh_theme()
         self.retranslate()
         self._page_state_changed(1, self.model.total_pages, self.model.page_size)
         QTimer.singleShot(0, lambda: self.model.load_page(0))
@@ -280,9 +309,22 @@ class DataWidget(QWidget):
     def _tool_button(self, icon_name: str) -> HintToolButton:
         button = HintToolButton()
         button.setProperty("nav", True)
-        button.setIcon(make_icon(icon_name))
+        button.setProperty("iconName", icon_name)
         button.setFixedSize(32, 32)
         return button
+
+    def refresh_theme(self) -> None:
+        theme = "dark" if self.palette().color(self.backgroundRole()).lightness() < 128 else "light"
+        for btn in (self.search_previous_button, self.search_next_button, self.search_clear_button):
+            icon_name = btn.property("iconName")
+            if isinstance(icon_name, str):
+                btn.setIcon(make_themed_icon(icon_name, theme, "muted", 16))
+        self.extract_images_button.setIcon(make_themed_icon("image", theme, "on_primary", 16))
+
+    def changeEvent(self, event: QEvent) -> None:  # noqa: N802 - Qt naming convention
+        super().changeEvent(event)
+        if event.type() in {QEvent.Type.PaletteChange, QEvent.Type.StyleChange}:
+            self.refresh_theme()
 
     def _configure_table_columns(self) -> None:
         header = self.table.horizontalHeader()
@@ -308,10 +350,12 @@ class DataWidget(QWidget):
 
         # 中文：优先让正文类字段吸收窗口剩余宽度，避免少量列的数据表右侧出现大片空白；超宽 Schema 仍保留横向滚动。
         # English: A descriptive text field absorbs spare viewport width to avoid a large blank area on narrow schemas, while wide schemas still retain horizontal scrolling.
-        if stretch_column is not None:
-            header.setSectionResizeMode(stretch_column, QHeaderView.ResizeMode.Stretch)
-        elif self.document.total_columns:
-            header.setSectionResizeMode(self.document.total_columns - 1, QHeaderView.ResizeMode.Stretch)
+        target_col = stretch_column if stretch_column is not None else (self.document.total_columns - 1 if self.document.total_columns else None)
+        if target_col is not None and self.document.total_columns <= 6:
+            total_w = sum(self.table.columnWidth(c) for c in range(self.document.total_columns))
+            viewport_w = max(600, self.table.viewport().width())
+            if total_w < viewport_w:
+                self.table.setColumnWidth(target_col, self.table.columnWidth(target_col) + (viewport_w - total_w - 24))
 
     def _restore_column_order(self) -> None:
         # 中文：恢复的是表头视觉位置而不是模型字段索引，因此数据访问、导出和搜索仍保持稳定的 Schema 映射。
@@ -451,11 +495,26 @@ class DataWidget(QWidget):
     def _page_state_changed(self, current_page: int, total_pages: int, page_size: int) -> None:
         self.pagination.set_state(current_page, total_pages, page_size, self.document.total_rows)
 
+    def _update_empty_banner(self) -> None:
+        if self.model.is_loading:
+            self.empty_banner.setVisible(False)
+            return
+        if self.document.total_rows == 0:
+            self.empty_banner_label.setText(self.translator.tr("data.empty_file"))
+            self.empty_banner_clear_btn.setVisible(False)
+            self.empty_banner.setVisible(True)
+        elif self.model.rowCount() == 0 and self._page_filter_state.active:
+            self.empty_banner_label.setText(self.translator.tr("data.filter_empty"))
+            self.empty_banner_clear_btn.setVisible(True)
+            self.empty_banner.setVisible(True)
+        else:
+            self.empty_banner.setVisible(False)
+
     def _resize_rows(self) -> None:
-        # 中文：新页先使用紧凑文本行高；图片单元格真正进入可见区并完成缩略图解码后再单独增高，避免预扫描整页附件。
-        # English: A new page starts with compact text rows, and only image cells that become visible and decode successfully expand their rows, avoiding a full-page attachment scan.
         for row in range(self.model.rowCount()):
-            self.table.setRowHeight(row, DEFAULT_ROW_HEIGHT)
+            height = IMAGE_ROW_HEIGHT if self.model.row_has_cached_image(row) else DEFAULT_ROW_HEIGHT
+            self.table.setRowHeight(row, height)
+        self._update_empty_banner()
 
     def _image_cell_ready(self, row: int, _column: int) -> None:
         if row < 0 or row >= self.model.rowCount():
@@ -826,11 +885,9 @@ class DataWidget(QWidget):
             )
         else:
             order = Qt.SortOrder.AscendingOrder
-        self._sort_column = logical_column
-        self._sort_order = order
+        self._pending_sort = (logical_column, order)
         self.table.horizontalHeader().setSortIndicatorShown(True)
         self.table.horizontalHeader().setSortIndicator(logical_column, order)
-        self.sort_clear_button.setEnabled(True)
         if self._active_sort_worker is not None:
             self._active_sort_worker.cancel()
         # 中文：表头点击启动的是全文件索引排序而非当前页排序，否则翻页后顺序会失去一致性。
@@ -843,16 +900,34 @@ class DataWidget(QWidget):
             lambda result, active_worker=worker: self._file_sort_finished(active_worker, result),
         )
 
+    def _restore_sort_indicator(self) -> None:
+        if self._sort_column >= 0:
+            self.table.horizontalHeader().setSortIndicatorShown(True)
+            self.table.horizontalHeader().setSortIndicator(self._sort_column, self._sort_order)
+            self.sort_clear_button.setEnabled(True)
+            self.sort_clear_button.setVisible(True)
+        else:
+            self.table.horizontalHeader().setSortIndicatorShown(False)
+            self.sort_clear_button.setEnabled(False)
+            self.sort_clear_button.setVisible(False)
+
     def _file_sort_finished(self, worker: object, result: object) -> None:
         if self._active_sort_worker is not worker:
             return
         self._active_sort_worker = None
-        if not isinstance(result, tuple) or len(result) != 3:
+        pending = self._pending_sort
+        self._pending_sort = None
+        if not isinstance(result, tuple) or len(result) != 3 or pending is None:
+            self._restore_sort_indicator()
             return
         column, descending, source_rows = result
-        if column != self._sort_column or descending != (self._sort_order == Qt.SortOrder.DescendingOrder):
+        if column != pending[0] or descending != (pending[1] == Qt.SortOrder.DescendingOrder):
+            self._restore_sort_indicator()
             return
         if isinstance(source_rows, list):
+            self._sort_column, self._sort_order = pending
+            self.sort_clear_button.setEnabled(True)
+            self.sort_clear_button.setVisible(True)
             self.model.set_row_order(source_rows)
             self._refresh_file_search_order()
 
@@ -863,6 +938,7 @@ class DataWidget(QWidget):
         self._sort_column = -1
         self.table.horizontalHeader().setSortIndicatorShown(False)
         self.sort_clear_button.setEnabled(False)
+        self.sort_clear_button.setVisible(False)
         self.model.clear_row_order()
         self._refresh_file_search_order()
 
@@ -1087,6 +1163,8 @@ class DataWidget(QWidget):
         progress.close()
         if worker is self._active_sort_worker:
             self._active_sort_worker = None
+            self._pending_sort = None
+            self._restore_sort_indicator()
         show_message(self, self.translator.tr("common.error"), message, critical=True)
         thread.quit()
 
@@ -1095,6 +1173,13 @@ class DataWidget(QWidget):
             return
         self._shutting_down = True
         self._search_generation += 1
+        try:
+            self.translator.language_changed.disconnect(self.retranslate)
+        except (RuntimeError, TypeError):
+            pass
+        self.search_timer.stop()
+        self.column_order_timer.stop()
+        self.hover_preview.shutdown()
         for dialog in tuple(self._detail_dialogs):
             dialog.close()
         self._detail_dialogs.clear()
@@ -1140,6 +1225,8 @@ class DataWidget(QWidget):
             self.filter_operator_combo.setCurrentIndex(max(index, 0))
         self.filter_apply_button.setText(self.translator.tr("data.apply_filter"))
         self.filter_clear_button.setText(self.translator.tr("data.clear_filter"))
+        self.empty_banner_clear_btn.setText(self.translator.tr("data.clear_filter"))
+        self._update_empty_banner()
         self.sort_clear_button.setText(self.translator.tr("data.clear_file_sort"))
         self.extract_images_button.setText(self.translator.tr("data.extract_images"))
         self._search_matches_changed(len(self.model.search_matches))

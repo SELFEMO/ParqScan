@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Callable
 
 import psutil
-from PySide6.QtCore import QSize, QThread, QTimer, Qt
+from PySide6.QtCore import QByteArray, QSize, QTimer, Qt
 from PySide6.QtGui import QAction, QActionGroup, QDragEnterEvent, QDropEvent, QIcon
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -30,6 +30,7 @@ from PySide6.QtWidgets import (
 from parqscan.config import ConfigManager
 from parqscan.constants import APP_NAME, MEMORY_STATUS_INTERVAL_MS
 from parqscan.data.parquet_document import ParquetDocument
+from parqscan.data.task_runner import BackgroundTaskRunner
 from parqscan.data.workers import ExportWorker, FragmentExportWorker
 from parqscan.dialogs.range_export_dialog import RangeExportDialog
 from parqscan.i18n import Translator
@@ -67,8 +68,7 @@ class MainWindow(QMainWindow):
         self.update_controller = update_controller
         self.contexts: list[DocumentContext] = []
         self._open_sequence = 0
-        self._threads: list[QThread] = []
-        self._worker_contexts: dict[object, tuple[QProgressDialog, QThread, Callable[[object], None]]] = {}
+        self._task_runner = BackgroundTaskRunner(self)
         self._update_progress: QProgressDialog | None = None
         self._update_check_progress: QProgressDialog | None = None
         self.setWindowIcon(app_icon)
@@ -187,6 +187,7 @@ class MainWindow(QMainWindow):
         self.close_action.setShortcut("Ctrl+W")
         self.close_action.triggered.connect(self.close_current_document)
         self.exit_action = QAction(self)
+        self.exit_action.setShortcut("Ctrl+Q")
         self.exit_action.triggered.connect(self.close)
         self.file_menu.addAction(self.open_action)
         self.file_menu.addMenu(self.recent_menu)
@@ -211,6 +212,26 @@ class MainWindow(QMainWindow):
         self.search_action.setShortcut("Ctrl+F")
         self.search_action.triggered.connect(self.focus_search)
         self.view_menu.addAction(self.search_action)
+
+        self.find_next_action = QAction(self)
+        self.find_next_action.setShortcut("F3")
+        self.find_next_action.triggered.connect(lambda: self._navigate_current_search(1))
+        self.addAction(self.find_next_action)
+
+        self.find_prev_action = QAction(self)
+        self.find_prev_action.setShortcut("Shift+F3")
+        self.find_prev_action.triggered.connect(lambda: self._navigate_current_search(-1))
+        self.addAction(self.find_prev_action)
+
+        self.tab_meta_action = QAction(self)
+        self.tab_meta_action.setShortcut("Alt+1")
+        self.tab_meta_action.triggered.connect(lambda: self._switch_current_tab(0))
+        self.addAction(self.tab_meta_action)
+
+        self.tab_data_action = QAction(self)
+        self.tab_data_action.setShortcut("Alt+2")
+        self.tab_data_action.triggered.connect(lambda: self._switch_current_tab(1))
+        self.addAction(self.tab_data_action)
         self.view_menu.addSeparator()
         self.theme_group = QActionGroup(self)
         self.theme_group.setExclusive(True)
@@ -252,13 +273,15 @@ class MainWindow(QMainWindow):
             self.update_controller.download_finished.connect(self._on_update_download_finished)
             self.update_controller.download_failed.connect(self._on_update_download_failed)
         self._rebuild_recent_menu()
+        self.close_action.setEnabled(False)
+        self.export_menu.setEnabled(False)
 
     def current_context(self) -> DocumentContext | None:
         row = self.file_list.currentRow()
         return self.contexts[row] if 0 <= row < len(self.contexts) else None
 
     def open_file_dialog(self) -> None:
-        paths, _ = QFileDialog.getOpenFileNames(self, self.translator.tr("file.open"), "", "Parquet (*.parquet);;All files (*)")
+        paths, _ = QFileDialog.getOpenFileNames(self, self.translator.tr("file.open"), "", "Parquet (*.parquet *.parq *.pq);;All files (*)")
         for path in paths:
             self.open_path(path)
 
@@ -282,16 +305,23 @@ class MainWindow(QMainWindow):
 
         item = QListWidgetItem(document.display_name)
         item.setToolTip(document.path)
-        item.setSizeHint(QSize(0, 40))
+        item.setSizeHint(QSize(0, max(36, self.file_list.fontMetrics().height() + 20)))
         self.file_list.addItem(item)
         self._open_sequence += 1
         context = DocumentContext(document, widget, item, self._open_sequence)
         self.contexts.append(context)
         self.document_stack.addWidget(widget)
-        widget.data_widget.coordinate_changed.connect(self._update_coordinate_status)
-        widget.data_widget.loaded_rows_changed.connect(self._update_rows_status)
+        widget.coordinate_changed.connect(
+            lambda r, c, w=widget: self._update_coordinate_status_for(w, r, c)
+        )
+        widget.loaded_rows_changed.connect(
+            lambda loaded, w=widget: self._update_rows_status_for(w, loaded)
+        )
+        widget.status_message.connect(lambda msg: self.statusBar().showMessage(msg, 2500))
         self.config.add_recent_file(document.path)
         self._rebuild_recent_menu()
+        self.close_action.setEnabled(False)
+        self.export_menu.setEnabled(False)
         self._apply_file_list_sort(document.path)
         self.files_caption.setText(self.translator.tr("sidebar.open_files_count", count=len(self.contexts)))
 
@@ -333,16 +363,20 @@ class MainWindow(QMainWindow):
             self._switch_document(-1)
 
     def _switch_document(self, row: int) -> None:
-        if 0 <= row < len(self.contexts):
+        has_doc = 0 <= row < len(self.contexts)
+        self.close_action.setEnabled(has_doc)
+        self.export_menu.setEnabled(has_doc)
+        if has_doc:
             context = self.contexts[row]
             self.document_stack.setCurrentWidget(context.widget)
             self.setWindowTitle(f"{APP_NAME} — {context.document.display_name}")
-            self._update_rows_status(context.widget.data_widget.model.loaded_rows)
+            self._update_rows_status(context.widget.loaded_rows)
             self.close_file_button.setVisible(True)
         else:
             self.document_stack.setCurrentWidget(self.welcome)
             self.setWindowTitle(APP_NAME)
             self._update_rows_status(0)
+            self.coordinate_status.clear()
             self.close_file_button.setVisible(False)
 
     def close_current_document(self) -> None:
@@ -406,55 +440,28 @@ class MainWindow(QMainWindow):
         self._run_worker(worker, self.translator.tr("progress.exporting"), self._export_finished)
 
     def _run_worker(self, worker, title: str, callback: Callable[[object], None]) -> None:
+        self._task_runner.start(
+            worker,
+            on_finished=callback,
+            on_failed=lambda message: show_message(self, self.translator.tr("common.error"), message, critical=True),
+            progress_title=title,
+            cancel_label=self.translator.tr("common.cancel"),
+        )
+
+    def _navigate_current_search(self, direction: int) -> None:
         context = self.current_context()
         if context is None:
             return
-        thread = QThread(self)
-        self._threads.append(thread)
-        worker.moveToThread(thread)
-        progress = QProgressDialog(title, self.translator.tr("common.cancel"), 0, context.document.total_rows, self)
-        progress.setObjectName("TaskProgressDialog")
-        progress.setWindowModality(Qt.WindowModality.WindowModal)
-        progress.setMinimumDuration(0)
-        progress.setAutoClose(False)
-        self._worker_contexts[worker] = (progress, thread, callback)
-        thread.started.connect(worker.run)
-        progress.canceled.connect(worker.cancel, Qt.ConnectionType.DirectConnection)
-        worker.progress.connect(self._worker_progress)
-        worker.finished.connect(self._worker_finished)
-        worker.failed.connect(self._worker_failed)
-        thread.finished.connect(worker.deleteLater)
-        thread.finished.connect(thread.deleteLater)
-        thread.finished.connect(lambda: self._threads.remove(thread) if thread in self._threads else None)
-        thread.start()
+        context.widget.tabs.setCurrentWidget(context.widget.data_widget)
+        if direction >= 0:
+            context.widget.data_widget.search_next()
+        else:
+            context.widget.data_widget.search_previous()
 
-    def _worker_progress(self, current: int, total: int) -> None:
-        context = self._worker_contexts.get(self.sender())
-        if context is None:
-            return
-        progress, _thread, _callback = context
-        progress.setMaximum(max(total, 1))
-        progress.setValue(current)
-
-    def _worker_finished(self, value: object) -> None:
-        worker = self.sender()
-        context = self._worker_contexts.pop(worker, None)
-        if context is None:
-            return
-        progress, thread, callback = context
-        progress.close()
-        callback(value)
-        thread.quit()
-
-    def _worker_failed(self, message: str) -> None:
-        worker = self.sender()
-        context = self._worker_contexts.pop(worker, None)
-        if context is None:
-            return
-        progress, thread, _callback = context
-        progress.close()
-        show_message(self, self.translator.tr("common.error"), message, critical=True)
-        thread.quit()
+    def _switch_current_tab(self, index: int) -> None:
+        context = self.current_context()
+        if context is not None and 0 <= index < context.widget.tabs.count():
+            context.widget.tabs.setCurrentIndex(index)
 
     def _export_finished(self, target: object) -> None:
         if target:
@@ -463,6 +470,18 @@ class MainWindow(QMainWindow):
                 self.translator.tr("common.completed"),
                 self.translator.tr("export.completed", path=str(target)),
             )
+
+    def _update_coordinate_status_for(self, widget: DocumentWidget, row: int, column: int) -> None:
+        context = self.current_context()
+        if context is None or context.widget is not widget:
+            return
+        self._update_coordinate_status(row, column)
+
+    def _update_rows_status_for(self, widget: DocumentWidget, loaded: int) -> None:
+        context = self.current_context()
+        if context is None or context.widget is not widget:
+            return
+        self._update_rows_status(loaded)
 
     def _update_coordinate_status(self, row: int, column: int) -> None:
         self.coordinate_status.setText(self.translator.tr("status.coordinate", row=row, column=column))
@@ -679,6 +698,8 @@ class MainWindow(QMainWindow):
         self._update_rows_status(self.current_context().widget.data_widget.model.loaded_rows if self.current_context() else 0)
         self._update_memory_status()
         self._rebuild_recent_menu()
+        self.close_action.setEnabled(False)
+        self.export_menu.setEnabled(False)
 
     def dragEnterEvent(self, event: QDragEnterEvent) -> None:
         if event.mimeData().hasUrls() and any(url.toLocalFile().lower().endswith(".parquet") for url in event.mimeData().urls()):
@@ -696,7 +717,7 @@ class MainWindow(QMainWindow):
             context.widget.shutdown()
         for worker in list(self._worker_contexts):
             worker.cancel()
-        for thread in list(self._threads):
-            thread.quit()
-            thread.wait(1000)
+        self._task_runner.shutdown()
+        encoded = bytes(self.saveGeometry().toBase64()).decode("ascii")
+        self.config.set_window_geometry("main_window", encoded)
         super().closeEvent(event)

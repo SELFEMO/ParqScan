@@ -31,8 +31,7 @@
   },
   "tabs": {
     "metadata": "Metadata",
-    "data": "Data preview",
-    "hex": "Binary inspector"
+    "data": "Data preview"
   },
   "common": {
     "previous": "Previous",
@@ -45,7 +44,10 @@
     "information": "Information",
     "completed": "Completed",
     "search": "Search",
-    "confirm": "OK"
+    "confirm": "OK",
+    "select_all": "Select all",
+    "clear_all": "Clear all",
+    "copied": "Copied"
   },
   "metadata": {
     "eyebrow": "FILE ANALYSIS",
@@ -82,9 +84,7 @@
     "apply_filter": "Apply filter",
     "clear_filter": "Clear filter",
     "extract_images": "Extract images",
-    "match_count": "{count} matches",
     "items_per_page": "Rows per page",
-    "page_summary": "Page {page} / {total} · {rows} total rows",
     "first_page": "First page",
     "previous_page": "Previous page",
     "next_page": "Next page",
@@ -97,7 +97,6 @@
     "page_range_summary": "Rows {start}–{end} · {rows} total",
     "page_total": "{total} pages",
     "searching": "Searching file… {percent}%",
-    "match_position": "{current} / {count} matches",
     "clear_file_sort": "Restore file order",
     "reset_column_order": "Reset column order",
     "search_scope_file": "File search",
@@ -109,7 +108,9 @@
     "file_match_position": "File {current} / {count}",
     "page_match_position": "Page {current} / {count}",
     "match_hidden_by_filter": "The match is hidden by the current-page filter. Clear the filter to locate it.",
-    "file_matches_hidden_by_filter": "{count} matches in file · none visible under the current filter"
+    "file_matches_hidden_by_filter": "{count} matches in file · none visible under the current filter",
+    "empty_file": "This Parquet file contains 0 rows.",
+    "filter_empty": "No rows on this page match the current filter."
   },
   "detail": {
     "window_title": "Row {row} details",
@@ -131,7 +132,12 @@
     "search_close": "Close search",
     "search_no_match": "No matches",
     "search_position": "{current} / {count} matches",
-    "multi_select_hint": "Ctrl/Command or Shift-click fields to compare them. Newly selected tiles stack at the canvas origin (0,0) on top; existing tiles keep their position and size. Each tile can be dragged, resized, and wrap text. Selecting text highlights every identical string in the currently displayed details."
+    "multi_select_hint": "Ctrl/Command or Shift-click fields to compare them. Newly selected tiles stack at the canvas origin (0,0) on top; existing tiles keep their position and size. Each tile can be dragged, resized, and wrap text. Selecting text highlights every identical string in the currently displayed details.",
+    "tile_grid": "Tile cards",
+    "view_preview": "Preview",
+    "view_hex": "Hex",
+    "view_json": "JSON",
+    "truncated_notice": "Content exceeds preview limit; showing first 2 MB."
   },
   "context": {
     "open_detail": "Open full details",
@@ -148,7 +154,6 @@
     "empty_title": "No raw bytes loaded",
     "empty_hint": "Choose a binary field in record details, or right-click a binary table cell and select “View raw bytes”.",
     "cell_label": "{column} · Row {row}",
-    "purpose": "Inspect a binary field’s raw bytes and locate content by Hex, text, or byte offset.",
     "mode_auto": "Auto",
     "mode_hex": "Hex bytes",
     "mode_text": "Text",
@@ -158,7 +163,9 @@
     "no_match": "No match",
     "invalid_query": "Invalid search format",
     "purpose_compact": "Advanced tool: search the current field’s raw bytes directly; use record details for image viewing.",
-    "search_ready": "Click Search to locate"
+    "search_ready": "Click Search to locate",
+    "window_notice": "Showing 64 KB window at offset 0x{offset:08X} ({total} total).",
+    "offset_out_of_range": "Offset 0x{offset:X} is outside the {total}-byte payload."
   },
   "images": {
     "preview_title": "Image preview",
@@ -182,7 +189,14 @@
     "title": "Export Parquet row and column range",
     "start_row": "Start row",
     "end_row": "End row",
-    "columns": "Select fields"
+    "columns": "Select fields",
+    "subtitle": "Choose a row range and columns to export as a Parquet fragment.",
+    "select_all": "Select all",
+    "clear_all": "Clear",
+    "selection_summary": "{rows:,} rows · {cols} of {total_cols} columns selected",
+    "invalid_empty": "This file has no rows to export.",
+    "invalid_range": "Start row must be less than or equal to end row.",
+    "invalid_columns": "Select at least one column to export."
   },
   "progress": {
     "exporting": "Exporting data…",

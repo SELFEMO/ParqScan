@@ -16,16 +16,20 @@ class Translator(QObject):
         system_language = "zh" if QLocale.system().name().lower().startswith("zh") else "en"
         self.language = configured_language if configured_language in {"zh", "en"} else system_language
         self._messages: dict[str, Any] = {}
+        self._fallback: dict[str, Any] = self._read_locale("en")
         self._load()
 
-    def _load(self) -> None:
-        path = resource_path("locales", f"{self.language}.json")
+    @staticmethod
+    def _read_locale(language: str) -> dict[str, Any]:
+        path = resource_path("locales", f"{language}.json")
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
+            return payload if isinstance(payload, dict) else {}
         except (OSError, json.JSONDecodeError):
-            self._messages = {}
-            return
-        self._messages = payload if isinstance(payload, dict) else {}
+            return {}
+
+    def _load(self) -> None:
+        self._messages = self._read_locale(self.language)
 
     def set_language(self, language: str) -> None:
         if language not in {"zh", "en"} or language == self.language:
@@ -34,13 +38,21 @@ class Translator(QObject):
         self._load()
         self.language_changed.emit()
 
-    def tr(self, key: str, **values: Any) -> str:
-        node: Any = self._messages
+    @staticmethod
+    def _lookup(mapping: dict[str, Any], key: str) -> str | None:
+        node: Any = mapping
         for part in key.split("."):
             if not isinstance(node, dict) or part not in node:
-                return key
+                return None
             node = node[part]
-        text = str(node)
+        return str(node)
+
+    def tr(self, key: str, **values: Any) -> str:
+        text = self._lookup(self._messages, key)
+        if text is None:
+            text = self._lookup(self._fallback, key)
+        if text is None:
+            return key
         try:
             return text.format(**values)
         except (KeyError, ValueError):

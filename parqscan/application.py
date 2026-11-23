@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Callable, Sequence
 
 from PySide6.QtCore import QTimer
-from PySide6.QtGui import QIcon
+from PySide6.QtGui import QIcon, QImageReader
 from PySide6.QtWidgets import QApplication
 
 from parqscan.config import ConfigManager
@@ -16,12 +16,14 @@ from parqscan.release import release_name
 from parqscan.themes import ThemeManager
 from parqscan.update.controller import UpdateController
 
+_SUPPORTED_PARQUET_SUFFIXES = {".parquet", ".parq", ".pq"}
+
 
 def _command_line_paths(arguments: Sequence[str]) -> list[str]:
     paths: list[str] = []
     for argument in arguments[1:]:
         path = Path(argument).expanduser()
-        if path.is_file() and path.suffix.casefold() == ".parquet":
+        if path.is_file() and path.suffix.casefold() in _SUPPORTED_PARQUET_SUFFIXES:
             paths.append(str(path.resolve()))
     return paths
 
@@ -32,12 +34,13 @@ def run(
     *,
     smoke_test: bool = False,
 ) -> int:
-    args = list(arguments or sys.argv)
+    args = list(sys.argv) if arguments is None else list(arguments)
     application = QApplication(args)
     application.setApplicationName(APP_NAME)
     application.setApplicationVersion(release_name())
     application.setOrganizationName(APP_NAME)
     application.setStyle("Fusion")
+    QImageReader.setAllocationLimit(256)
 
     config = ConfigManager()
     translator = Translator(config.get("language"))
@@ -58,7 +61,11 @@ def run(
         return 0
 
     window.show()
-    QTimer.singleShot(3000, update_controller.maybe_auto_check)
+    update_timer = QTimer(window)
+    update_timer.setSingleShot(True)
+    update_timer.setInterval(3000)
+    update_timer.timeout.connect(update_controller.maybe_auto_check)
+    update_timer.start()
     for path in _command_line_paths(args):
         window.open_path(path)
     return application.exec()

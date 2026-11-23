@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QEvent, QTimer, Qt, Signal
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -21,7 +21,7 @@ from PySide6.QtWidgets import (
 from parqscan.data.parquet_document import ParquetDocument
 from parqscan.i18n import Translator
 from parqscan.utils.binary import format_size
-from parqscan.utils.icons import make_icon
+from parqscan.utils.icons import make_themed_icon
 from parqscan.widgets.design_system import CardFrame, ElidingLabel, HintToolButton, MetricCard
 
 
@@ -69,7 +69,7 @@ class MetadataWidget(QWidget):
         self.path_label.setObjectName("PathLabel")
         self.copy_path_button = HintToolButton()
         self.copy_path_button.setProperty("nav", True)
-        self.copy_path_button.setIcon(make_icon("copy"))
+        self.refresh_theme()
         self.copy_path_button.setFixedSize(32, 32)
         path_layout.addWidget(self.path_caption)
         path_layout.addWidget(self.path_label, 1)
@@ -128,11 +128,11 @@ class MetadataWidget(QWidget):
         self.row_group_tree.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
         self.row_group_tree.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
         self.row_group_tree.header().setMinimumHeight(42)
-        self.row_group_tree.header().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         self.row_group_tree.header().setStretchLastSection(False)
         self.row_group_tree.itemExpanded.connect(self._populate_row_group_children)
         groups_layout.addWidget(self.row_group_tree)
 
+        self.detail_tabs.setMinimumHeight(320)
         self.detail_tabs.addTab(self.schema_panel, "")
         self.detail_tabs.addTab(self.groups_panel, "")
 
@@ -155,39 +155,60 @@ class MetadataWidget(QWidget):
         self.translator.language_changed.connect(self.retranslate)
         self.retranslate()
 
+    def refresh_theme(self) -> None:
+        theme = "dark" if self.palette().color(self.backgroundRole()).lightness() < 128 else "light"
+        self.copy_path_button.setIcon(make_themed_icon("copy", theme, "muted", 18))
+
+    def changeEvent(self, event: QEvent) -> None:  # noqa: N802 - Qt naming convention
+        super().changeEvent(event)
+        if event.type() in {QEvent.Type.PaletteChange, QEvent.Type.StyleChange}:
+            self.refresh_theme()
+
+    def shutdown(self) -> None:
+        try:
+            self.translator.language_changed.disconnect(self.retranslate)
+        except (RuntimeError, TypeError):
+            pass
+
     def _copy_path(self) -> None:
         QGuiApplication.clipboard().setText(self.document.path)
+        copied = self.translator.tr("common.copied")
+        self.copy_path_button.set_hint(copied)
+        self.status_message.emit(f"{copied}: {self.document.path}")
+        QTimer.singleShot(2000, lambda: self.copy_path_button.set_hint(self.translator.tr("metadata.copy_path")))
 
     def _configure_columns(self) -> None:
         header = self.schema_table.horizontalHeader()
         # 中文：将逻辑类型列设为弹性列，并为其余统计列保留稳定宽度，避免正常窗口下最后一列被截断并出现无意义的横向滚动。
         # English: The logical-type column absorbs spare space while statistical columns keep stable widths, preventing the final column from being clipped in a normal window.
+        header.setMinimumSectionSize(64)
         modes = (
             QHeaderView.ResizeMode.Interactive,
             QHeaderView.ResizeMode.Stretch,
             QHeaderView.ResizeMode.Interactive,
-            QHeaderView.ResizeMode.Fixed,
-            QHeaderView.ResizeMode.Fixed,
-            QHeaderView.ResizeMode.Fixed,
-            QHeaderView.ResizeMode.Fixed,
-            QHeaderView.ResizeMode.Fixed,
+            QHeaderView.ResizeMode.Interactive,
+            QHeaderView.ResizeMode.Interactive,
+            QHeaderView.ResizeMode.Interactive,
+            QHeaderView.ResizeMode.Interactive,
+            QHeaderView.ResizeMode.Interactive,
         )
-        widths = (156, 280, 142, 72, 104, 108, 88, 94)
+        widths = (140, 220, 130, 68, 96, 104, 88, 94)
         for column, (mode, width) in enumerate(zip(modes, widths)):
             header.setSectionResizeMode(column, mode)
             self.schema_table.setColumnWidth(column, width)
 
         tree_header = self.row_group_tree.header()
+        tree_header.setMinimumSectionSize(64)
         tree_modes = (
-            QHeaderView.ResizeMode.Fixed,
-            QHeaderView.ResizeMode.Fixed,
-            QHeaderView.ResizeMode.Fixed,
+            QHeaderView.ResizeMode.Interactive,
+            QHeaderView.ResizeMode.Interactive,
+            QHeaderView.ResizeMode.Interactive,
             QHeaderView.ResizeMode.Stretch,
             QHeaderView.ResizeMode.Interactive,
             QHeaderView.ResizeMode.Interactive,
-            QHeaderView.ResizeMode.Fixed,
+            QHeaderView.ResizeMode.Interactive,
         )
-        tree_widths = (78, 94, 104, 240, 170, 170, 94)
+        tree_widths = (78, 88, 98, 200, 150, 150, 90)
         for column, (mode, width) in enumerate(zip(tree_modes, tree_widths)):
             tree_header.setSectionResizeMode(column, mode)
             self.row_group_tree.setColumnWidth(column, width)
