@@ -397,25 +397,31 @@ class AdaptivePreviewGrid(QWidget):
             tile.setWindowTitle(title)
 
     def tile_all_previews(self) -> None:
-        if not self._tiles:
+        if not self._widgets:
             return
+        gap = 16
+        default_w = self.DEFAULT_TILE_SIZE.width()
+        default_h = self.DEFAULT_TILE_SIZE.height()
         canvas_width = max(480, self.width())
-        columns = max(1, min(len(self._tiles), canvas_width // (self.DEFAULT_TILE_WIDTH + self._spacing)))
+        columns = max(1, min(len(self._widgets), canvas_width // (default_w + gap)))
         x_cursor = 0
         y_cursor = 0
         row_height = 0
-        for idx, tile in enumerate(self._tiles.values()):
-            size = self._sizes.get(tile.widget_id(), QSize(self.DEFAULT_TILE_WIDTH, self.DEFAULT_TILE_HEIGHT))
+        for idx, widget in enumerate(self._widgets):
+            widget_id = self._widget_id(widget)
+            tile = self._docks.get(widget)
+            size = self._sizes.get(widget_id, QSize(default_w, default_h))
             if idx > 0 and idx % columns == 0:
                 x_cursor = 0
-                y_cursor += row_height + self._spacing
+                y_cursor += row_height + gap
                 row_height = 0
             pos = QPoint(x_cursor, y_cursor)
-            self._positions[tile.widget_id()] = pos
-            tile.move(pos)
-            x_cursor += size.width() + self._spacing
+            self._positions[widget_id] = pos
+            if tile is not None:
+                tile.move(pos)
+            x_cursor += size.width() + gap
             row_height = max(row_height, size.height())
-        self._refresh_canvas_bounds()
+        self._update_canvas_size()
 
     def reveal_preview(self, widget: QWidget) -> None:
         tile = self._docks.get(widget)
@@ -745,29 +751,6 @@ class FieldPreviewPane(CardFrame):
             self.stack.setCurrentWidget(self.text_editor)
         elif editor is self.hex_preview.editor:
             self.stack.setCurrentWidget(self.hex_preview)
-
-    def refresh_theme(self) -> None:
-        if not hasattr(self, "copy_button"):
-            return
-        theme = "dark" if self.palette().color(self.backgroundRole()).lightness() < 128 else "light"
-        self.copy_button.setIcon(make_themed_icon("copy", theme, "accent", 18))
-        self.export_button.setIcon(make_themed_icon("download", theme, "accent", 18))
-        self._refresh_text_highlights()
-
-    def changeEvent(self, event: QEvent) -> None:  # noqa: N802 - Qt naming convention
-        super().changeEvent(event)
-        if event.type() in {QEvent.Type.PaletteChange, QEvent.Type.StyleChange}:
-            self.refresh_theme()
-
-    def closeEvent(self, event) -> None:  # noqa: N802 - Qt naming convention
-        try:
-            self.translator.language_changed.disconnect(self.retranslate)
-        except (RuntimeError, TypeError):
-            pass
-        self._search_debounce_timer.stop()
-        self._highlight_timer.stop()
-        self.deleteLater()
-        super().closeEvent(event)
 
     def retranslate(self) -> None:
         self.row_chip.setText(self.translator.tr("detail.row_chip", row=self._source_row + 1))

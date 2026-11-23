@@ -702,21 +702,19 @@ class MainWindow(QMainWindow):
         self.export_menu.setEnabled(False)
 
     def dragEnterEvent(self, event: QDragEnterEvent) -> None:
-        if event.mimeData().hasUrls() and any(url.toLocalFile().lower().endswith(".parquet") for url in event.mimeData().urls()):
+        if event.mimeData().hasUrls() and any(url.toLocalFile().lower().endswith((".parquet", ".parq", ".pq")) for url in event.mimeData().urls()):
             event.acceptProposedAction()
 
     def dropEvent(self, event: QDropEvent) -> None:
         for url in event.mimeData().urls():
             path = url.toLocalFile()
-            if path.lower().endswith(".parquet"):
+            if path.lower().endswith((".parquet", ".parq", ".pq")):
                 self.open_path(path)
         event.acceptProposedAction()
 
     def closeEvent(self, event) -> None:
         for context in self.contexts:
             context.widget.shutdown()
-        for worker in list(self._worker_contexts):
-            worker.cancel()
         self._task_runner.shutdown()
         encoded = bytes(self.saveGeometry().toBase64()).decode("ascii")
         self.config.set_window_geometry("main_window", encoded)
