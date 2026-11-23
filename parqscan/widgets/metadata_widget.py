@@ -156,6 +156,8 @@ class MetadataWidget(QWidget):
         self.retranslate()
 
     def refresh_theme(self) -> None:
+        if not hasattr(self, "copy_path_button"):
+            return
         theme = "dark" if self.palette().color(self.backgroundRole()).lightness() < 128 else "light"
         self.copy_path_button.setIcon(make_themed_icon("copy", theme, "muted", 18))
 

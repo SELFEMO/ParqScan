@@ -244,6 +244,8 @@ class ImagePreviewDialog(QDialog):
         self.retranslate()
 
     def refresh_theme(self) -> None:
+        if not hasattr(self, "zoom_out_button"):
+            return
         theme = "dark" if self.palette().color(self.backgroundRole()).lightness() < 128 else "light"
         self.zoom_out_button.setIcon(make_themed_icon("zoom_out", theme, "accent", 18))
         self.zoom_in_button.setIcon(make_themed_icon("zoom_in", theme, "accent", 18))

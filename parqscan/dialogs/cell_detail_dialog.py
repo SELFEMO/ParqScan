@@ -651,6 +651,8 @@ class FieldPreviewPane(CardFrame):
         self.zoom_level_label.setText(f"{percent}%")
 
     def refresh_theme(self) -> None:
+        if not hasattr(self, "zoom_out_button"):
+            return
         theme = "dark" if self.palette().color(self.backgroundRole()).lightness() < 128 else "light"
         self.zoom_out_button.setIcon(make_themed_icon("zoom_out", theme, "accent", 18))
         self.zoom_in_button.setIcon(make_themed_icon("zoom_in", theme, "accent", 18))
@@ -745,6 +747,8 @@ class FieldPreviewPane(CardFrame):
             self.stack.setCurrentWidget(self.hex_preview)
 
     def refresh_theme(self) -> None:
+        if not hasattr(self, "copy_button"):
+            return
         theme = "dark" if self.palette().color(self.backgroundRole()).lightness() < 128 else "light"
         self.copy_button.setIcon(make_themed_icon("copy", theme, "accent", 18))
         self.export_button.setIcon(make_themed_icon("download", theme, "accent", 18))
@@ -1297,6 +1301,8 @@ class RecordDetailDialog(QDialog):
             show_message(self, self.translator.tr("common.error"), str(error), critical=True)
 
     def refresh_theme(self) -> None:
+        if not hasattr(self, "copy_button"):
+            return
         theme = "dark" if self.palette().color(self.backgroundRole()).lightness() < 128 else "light"
         self.copy_button.setIcon(make_themed_icon("copy", theme, "accent", 18))
         self.export_button.setIcon(make_themed_icon("download", theme, "accent", 18))

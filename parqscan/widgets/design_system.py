@@ -251,6 +251,8 @@ class SearchField(QFrame):
         layout.addWidget(self.editor, 1)
 
     def refresh_theme(self, theme: str = "light") -> None:
+        if not hasattr(self, "icon_label"):
+            return
         self.icon_label.setPixmap(make_themed_icon("search", theme, "muted", 16).pixmap(16, 16))
 
     def changeEvent(self, event: QEvent) -> None:  # noqa: N802 - Qt naming convention
@@ -513,7 +515,7 @@ class ZoomableImageView(QGraphicsView):
 
     def changeEvent(self, event: QEvent) -> None:  # noqa: N802 - Qt naming convention
         super().changeEvent(event)
-        if event.type() in {QEvent.Type.PaletteChange, QEvent.Type.StyleChange}:
+        if event.type() in {QEvent.Type.PaletteChange, QEvent.Type.StyleChange} and hasattr(self, "_scene"):
             self.setBackgroundBrush(QBrush(self.palette().color(QPalette.ColorRole.Base)))
 
     def resizeEvent(self, event: QResizeEvent) -> None:  # noqa: N802 - Qt naming convention
@@ -693,6 +695,8 @@ class PaginationBar(CardFrame):
         return button
 
     def refresh_theme(self, theme: str = "light") -> None:
+        if not hasattr(self, "first_button"):
+            return
         for button in (self.first_button, self.previous_button, self.next_button, self.last_button):
             icon_name = button.property("iconName")
             if isinstance(icon_name, str) and icon_name:

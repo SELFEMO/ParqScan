@@ -138,6 +138,8 @@ class HexPreviewWidget(QWidget):
         return button
 
     def refresh_theme(self) -> None:
+        if not hasattr(self, "search_button"):
+            return
         theme = "dark" if self.palette().color(self.backgroundRole()).lightness() < 128 else "light"
         self.search_button.setIcon(make_themed_icon("search", theme, "on_primary", 16))
         self.previous_button.setIcon(make_themed_icon("left", theme, "accent", 16))

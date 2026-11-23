@@ -125,6 +125,12 @@ class DataWidget(QWidget):
         self.header_eyebrow.setObjectName("EyebrowLabel")
         self.header_title = QLabel()
         self.header_title.setObjectName("PageTitle")
+        self.extract_images_button = QPushButton()
+        self.extract_images_button.setProperty("primary", True)
+        has_binary_col = any(contains_binary_type(field.type) for field in document.schema)
+        self.extract_images_button.setVisible(has_binary_col)
+        self.extract_images_button.setEnabled(has_binary_col)
+
         heading_row = QHBoxLayout()
         heading_row.setContentsMargins(0, 0, 0, 0)
         heading_row.setSpacing(12)
@@ -173,11 +179,6 @@ class DataWidget(QWidget):
         self.sort_clear_button.setProperty("ghost", True)
         self.sort_clear_button.setEnabled(False)
         self.sort_clear_button.setVisible(False)
-        self.extract_images_button = QPushButton()
-        self.extract_images_button.setProperty("primary", True)
-        has_binary_col = any(contains_binary_type(field.type) for field in document.schema)
-        self.extract_images_button.setVisible(has_binary_col)
-        self.extract_images_button.setEnabled(has_binary_col)
 
         filter_card = CardFrame(object_name="ToolbarCard")
         filter_layout = QHBoxLayout(filter_card)
@@ -314,6 +315,8 @@ class DataWidget(QWidget):
         return button
 
     def refresh_theme(self) -> None:
+        if not hasattr(self, "search_previous_button") or not hasattr(self, "extract_images_button"):
+            return
         theme = "dark" if self.palette().color(self.backgroundRole()).lightness() < 128 else "light"
         for btn in (self.search_previous_button, self.search_next_button, self.search_clear_button):
             icon_name = btn.property("iconName")
