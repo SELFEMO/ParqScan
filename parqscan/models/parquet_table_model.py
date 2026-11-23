@@ -127,6 +127,10 @@ class ParquetTableModel(QAbstractTableModel):
             return self._filtered_offsets
         return self._base_offsets()
 
+    @property
+    def is_loading(self) -> bool:
+        return self._loading
+
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         if parent.isValid():
             return 0
