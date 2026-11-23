@@ -384,10 +384,6 @@ QListWidget#FieldList {
     padding: 4px;
 }
 
-QListWidget#FieldList:focus {
-    padding: 3px;
-}
-
 QListWidget#FieldList::item {
     border-radius: 8px;
     padding: 7px 10px;
@@ -931,8 +927,12 @@ QListWidget#FieldList::item:selected:!active {
     color: #DCEEFF;
 }
 
-QPushButton:focus, QToolButton:focus, QTabBar::tab:focus, QListWidget:focus, QTableView:focus {
+QPushButton:focus, QToolButton:focus, QTabBar::tab:focus {
     border: 2px solid #47A3FF;
+}
+
+QListWidget:focus, QTableView:focus, QTableWidget:focus, QTreeWidget:focus {
+    border: 1px solid #47A3FF;
 }
 
 QPushButton[primary="true"]:pressed {
@@ -969,4 +969,11 @@ QSpinBox:disabled {
     background: #182230;
     color: #64748B;
     border-color: #2E3D54;
+}
+
+QScrollArea#DetailPreviewScroll {
+    background: #0E1520;
+    border: 1px solid #344154;
+    border-radius: 10px;
+    padding: 1px;
 }

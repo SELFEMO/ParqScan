@@ -259,7 +259,7 @@ class PreviewTile(QFrame):
             )
         }
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(1, 1, 1, 1)
         layout.setSpacing(0)
         layout.addWidget(self._title_bar, 0)
         layout.addWidget(widget, 1)
@@ -783,6 +783,12 @@ class FieldPreviewPane(CardFrame):
             self.size_chip.setText(self.translator.tr("detail.characters", count=f"{len(text):,}"))
 
 
+class RoundedPreviewScrollArea(QScrollArea):
+    def resizeEvent(self, event) -> None:  # noqa: N802 - Qt naming convention
+        super().resizeEvent(event)
+        _apply_rounded_mask(self, DETAIL_TILE_CORNER_RADIUS)
+
+
 class RecordDetailDialog(QDialog):
     def __init__(
         self,
@@ -914,7 +920,7 @@ class RecordDetailDialog(QDialog):
 
         self.preview_grid = AdaptivePreviewGrid()
         self.preview_grid.setObjectName("DetailPreviewGrid")
-        self.preview_scroll = QScrollArea()
+        self.preview_scroll = RoundedPreviewScrollArea()
         self.preview_scroll.setObjectName("DetailPreviewScroll")
         self.preview_scroll.setFrameShape(QFrame.Shape.NoFrame)
         self.preview_scroll.setWidgetResizable(True)
