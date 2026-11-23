@@ -2,6 +2,30 @@
 
 按日期记录重要修改及原因。同一天内相关改动已合并，更早条目保持原顺序。
 
+## 2026-11-23 — v0.3.5：UI 视觉规范化、并发安全与核心交互全面升级
+
+### 修改内容
+
+- 版本号升至 **0.3.5**，并同步更新站点文档与构建元数据。
+- **样式与设计系统重构**：
+  - 新增 `parqscan/tokens.py` 统一管理深浅双主题语义色；升级 `ThemeManager` 同步全局 `QPalette` 并发射 `theme_changed` 信号。
+  - 去重并重构 `light.qss` / `dark.qss`：修正 27 处 Qt 无效非整百 `font-weight`、补齐按钮变体 `:pressed`/`:disabled`/`:focus`、拉升主按钮与高亮色至 WCAG 2.1 AA（≥ 4.5:1）、移除无效 `letter-spacing`、补全跨平台字体栈与深色 `LoadingTitle` 字号。
+  - 修复主页面表格/树、详情画布 `DetailPreviewScroll` 与 `FieldList` 的圆角/焦点框切边问题，统一卡片与标题栏边框色，拉开数据表与分页栏间距。
+  - 升级 `parqscan/utils/icons.py` 支持 1x/2x HiDPI 光栅化与 `Disabled` 状态并修正几何路径；统一 `ParqScan.svg` 品牌蓝为 `#258BFF`；修复 `qt_images.py` 小图放大模糊与 `design_system.py` 高 DPI 缩放问题。
+- **并发安全、原子导出与表格渲染优化**：
+  - 全部后台 Worker（`workers.py`）改为按路径独立打开/关闭 `ParquetDocument`，消除跨线程句柄共享竞态；修补批量提图路径遍历漏洞，统一取消信号约定；引入 `pyarrow.compute.sort_indices` 与向量化搜索预筛。
+  - `export_service.py` 全格式改用同目录临时文件原子写入，消除取消残留损坏文件，并修复 SQL 引号/BLOB 与 Markdown/Excel 边界转义。
+  - `ParquetTableModel` 实现 `data()` 惰性取数、数值右对齐、NULL 斜体弱化、排序后 O(1) 索引与 `is_loading` 属性；`BinaryCellDelegate` 修复加载骨架闪白、搜索双绘糊字与缩略图越界；`ImageHoverPreview` 支持多屏避让定位与退出清理。
+- **视图、弹窗、国际化与工程化收口**：
+  - 新增 `parqscan/data/task_runner.py` 统一后台任务调度；`MainWindow` 阻断跨文档状态栏污染、无文档禁用导出/关闭菜单、支持主窗口几何持久化与 `F3`/`Shift+F3`/`Ctrl+Q`/`Alt+1/2` 快捷键。
+  - `DataWidget` 优化窄窗工具栏布局、修复过滤后图片行高塌陷与排序失败回滚、支持回车触发与零结果空态；`MetadataWidget` 解除固定列宽挤压并补齐路径复制反馈与 `status_message` 信号。
+  - `RecordDetailDialog` 修复搜索每字抢焦点、新增「预览 / Hex / JSON」多视图切换与「平铺排列」、2MB 大文本截断保护及关闭防泄漏；`HexPreviewWidget` 支持 64 KB 窗口分页渲染与跨行高亮；`RangeExportDialog` 增加全选/清空与实时表单校验。
+  - `i18n.py` 增加英文回退词库并清理 5 个死键；`config.py` 限制 `column_orders` LRU 上限与 `frozen` 便携模式判断；新增 `tests/test_design_upgrades.py` 自动化回归测试。
+
+### 设计原因
+
+系统性解决此前审计暴露的 Qt QSS 静默失效、WCAG 对比度不足、深浅切换图标/骨架脱节、表格圆角切边与跨线程句柄竞态问题，在保持低内存分页架构的同时提升大文件浏览流畅度与桌面端视觉一致性。
+
 ## 2026-09-21 — v0.3.3：检查更新可见反馈
 
 ### 修改内容

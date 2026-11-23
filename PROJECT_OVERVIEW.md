@@ -37,7 +37,7 @@ ParqScan 使用 Python、PySide6 与 PyArrow，在不把完整大文件物化到
 ### 2. 行选择与详情画布
 
 - 单击选中整行；双击打开 `RecordDetailDialog`，打开时快照源行各列值。
-- 左侧多选字段；右侧 `AdaptivePreviewGrid` 为普通 `QWidget` 画布。新格叠在 `(0, 0)` 并置顶，已有格位置与大小不变。
+- 左侧多选字段；右侧 `AdaptivePreviewGrid` 为普通 `QWidget` 画布。新格按级联偏移展开（首格在 `(0, 0)`）并支持「平铺排列」重排，已有格位置与大小不变。
 - `PreviewTile` 实心不透明，圆角由 mask 裁切，描边画在圆角路径上。标题条是唯一拖动手柄。
 - 打开详情、双击或主窗失焦时关闭主表图片悬停卡。
 - 字符串字段若整段为 JSON 对象或数组，详情里按层级缩进；标量与无效 JSON 保持原文。完整值不走平台 Tooltip。
@@ -56,7 +56,7 @@ ParqScan 使用 Python、PySide6 与 PyArrow，在不把完整大文件物化到
 
 ### 4. 原始字节
 
-非图片二进制在详情格或右键「查看原始字节」中打开 Hex + ASCII。搜索有显式按钮；自动模式把偶数长度十六进制当作 Hex；匹配在原始 bytes 上按字节推进并保留重叠。
+非图片二进制在详情格或右键「查看原始字节」中打开 Hex + ASCII（大载荷按 64 KB 窗口分页渲染并支持跨行高亮）；详情格支持在「预览 / Hex / JSON」间自由切换。搜索有显式按钮；自动模式把偶数长度十六进制当作 Hex；匹配在原始 bytes 上按字节推进并保留重叠。
 
 ### 5. 设计系统
 
@@ -82,7 +82,7 @@ ParqScan 使用 Python、PySide6 与 PyArrow，在不把完整大文件物化到
 - `parqscan/application.py`：生命周期、命令行路径、Windows AppId。
 - `parqscan/config.py`：便携或用户目录 JSON 配置。
 - `parqscan/constants.py`：分页、缩略图 / 悬停尺寸、行高、导出批次。
-- `parqscan/i18n.py` / `themes.py`：中英文与浅色 / 深色 / 跟随系统。
+- `parqscan/i18n.py` / `themes.py` / `tokens.py`：中英文（含英文回退）、浅色 / 深色语义 Token 源与 `QPalette`/`theme_changed` 主题总线。
 - `parqscan/main_window.py`：多文件工作区、菜单、导出 Worker、关于窗口、拖拽。
 
 ### 数据与模型
@@ -90,7 +90,7 @@ ParqScan 使用 Python、PySide6 与 PyArrow，在不把完整大文件物化到
 - `parqscan/data/parquet_document.py`：Schema、行组、范围读取、`close()`。
 - `parqscan/data/page_loader.py`：单页后台任务，结束时关闭临时文档。
 - `parqscan/data/export_service.py`：CSV / JSON / Excel / Markdown / SQL / Parquet 碎片。
-- `parqscan/data/workers.py`：导出与图片提取 Worker。
+- `parqscan/data/workers.py` / `task_runner.py`：线程隔离的导出/提图/搜索/排序 Worker 与统一 `BackgroundTaskRunner` 调度。
 - `parqscan/models/parquet_table_model.py`：当前页模型；`image_pixmap` 分 72 / 520 缓存。
 
 ### 工具
@@ -114,7 +114,7 @@ ParqScan 使用 Python、PySide6 与 PyArrow，在不把完整大文件物化到
 - `parqscan/locales/zh.json`、`en.json`（键集合必须一致）。
 - `parqscan/styles/light.qss`、`dark.qss`。
 - `parqscan/resources/ParqScan.svg`、`release.json`。
-- `tests/`：`test_binary`、`test_serialization`、`test_parquet_document`、`test_locales`、`test_ui_assets`、`test_build`。
+- `tests/`：`test_binary`、`test_serialization`、`test_parquet_document`、`test_locales`、`test_ui_assets`、`test_build`、`test_design_upgrades`。
 
 ## 四、行为边界
 
