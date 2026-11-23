@@ -8,15 +8,22 @@
     lang: "zh",
     theme: "system",
     strings: {},
-    release: "0.3.6",
+    release: "0.3.8",
     repoUrl: "https://github.com/SELFEMO/ParqScan",
     licenseUrl: "https://www.apache.org/licenses/LICENSE-2.0.html",
     releaseApiUrl: "https://api.github.com/repos/SELFEMO/ParqScan/releases/latest",
+    releasesListApiUrl: "https://api.github.com/repos/SELFEMO/ParqScan/releases",
+    fallbackPrereleaseTag: "pre-release-v0.3.6",
+    fallbackPrereleaseVersion: "0.3.6",
     windowsAssetName: "ParqScan-Windows-Setup.exe",
     macosArm64AssetName: "ParqScan-macOS-arm64.dmg",
     linuxDebAssetName: "ParqScan-Linux-amd64.deb",
     linuxRpmAssetName: "ParqScan-Linux-x86_64.rpm",
     releaseDownloadUrl: "",
+    releaseDownloadAvailable: null,
+    stableVersion: "",
+    prereleaseVersion: "",
+    prereleaseDownloadUrl: "",
     demoPage: 0,
     demoPageSize: 20,
   };
@@ -129,55 +136,132 @@
     }
   }
 
-  function currentPlatformAssetName() {
+  function detectedPlatformInfo() {
     const releaseApi = window.ParqScanRelease;
-    if (releaseApi && typeof releaseApi.preferredAssetName === "function") {
-      return releaseApi.preferredAssetName(state, navigator.userAgent, navigator.platform);
-    }
-    return state.windowsAssetName;
+    const detected = releaseApi?.detectPlatform(navigator.userAgent, navigator.platform) || "windows";
+    const platformName = releaseApi?.platformDisplayName(detected) || "Windows";
+    const assetName = releaseApi?.preferredAssetName(state, navigator.userAgent, navigator.platform) || state.windowsAssetName;
+    return { detected, platformName, assetName };
   }
 
   function applyReleaseLinks() {
-    const assetName = currentPlatformAssetName();
-    const fallback = window.ParqScanRelease?.latestDownloadUrl(state.repoUrl, assetName) || "";
-    const downloadUrl = state.releaseDownloadUrl || fallback;
+    const releaseApi = window.ParqScanRelease;
+    const { detected, platformName, assetName } = detectedPlatformInfo();
+    const releasesPage = releaseApi?.allReleasesPageUrl(state.repoUrl) || state.repoUrl;
+    const stableFallback =
+      detected === "windows"
+        ? releaseApi?.latestDownloadUrl(state.repoUrl, assetName) || releasesPage
+        : releasesPage;
+    const downloadUrl = state.releaseDownloadUrl || stableFallback;
+    const unavailable = state.releaseDownloadAvailable === false || (state.releaseDownloadAvailable === null && detected !== "windows");
 
     document.querySelectorAll("[data-release-download]").forEach((el) => {
-      if (downloadUrl) {
-        el.href = downloadUrl;
-      } else if (state.repoUrl) {
-        el.href = window.ParqScanRelease?.releasesPageUrl(state.repoUrl) || state.repoUrl;
+      el.href = downloadUrl || releasesPage;
+      el.textContent = unavailable
+        ? t("hero.ctaReleases")
+        : t("hero.ctaDownloadPlatform", { platform: platformName });
+    });
+
+    document.querySelectorAll("[data-prerelease-download]").forEach((el) => {
+      const previewVersion = state.prereleaseVersion || (detected === "windows" ? state.fallbackPrereleaseVersion : "");
+      const previewUrl =
+        state.prereleaseDownloadUrl ||
+        (state.fallbackPrereleaseTag && state.repoUrl
+          ? `${state.repoUrl.replace(/\/$/, "")}/releases/tag/${state.fallbackPrereleaseTag}`
+          : "");
+      if (previewVersion && previewUrl) {
+        el.hidden = false;
+        el.href = previewUrl;
+        el.textContent = t("hero.ctaPrerelease", { version: previewVersion });
+      } else {
+        el.hidden = true;
       }
     });
+
+    const statusEl = document.getElementById("release-status");
+    if (statusEl) {
+      if (unavailable) {
+        statusEl.hidden = false;
+        statusEl.textContent = t("hero.noPackageNotice", { platform: platformName });
+      } else if (state.prereleaseVersion && state.stableVersion) {
+        statusEl.hidden = false;
+        statusEl.textContent = t("hero.prereleaseNotice", {
+          stable: state.stableVersion,
+          preview: state.prereleaseVersion,
+        });
+      } else {
+        statusEl.hidden = true;
+        statusEl.textContent = "";
+      }
+    }
   }
 
   async function loadLatestRelease() {
     const releaseApi = window.ParqScanRelease;
-    if (!state.releaseApiUrl || !releaseApi) {
+    if (!releaseApi) {
       return;
     }
 
-    try {
-      const response = await fetch(state.releaseApiUrl, {
-        headers: { Accept: "application/vnd.github+json" },
-      });
-      if (!response.ok) {
-        throw new Error(`Release API failed: ${response.status}`);
+    let stablePayload = null;
+    let prereleasePayload = null;
+
+    if (state.releasesListApiUrl) {
+      try {
+        const response = await fetch(state.releasesListApiUrl, {
+          headers: { Accept: "application/vnd.github+json" },
+        });
+        if (response.ok) {
+          const listPayload = await response.json();
+          const selected = releaseApi.selectReleases(listPayload);
+          stablePayload = selected.stable;
+          prereleasePayload = selected.prerelease;
+        }
+      } catch (_error) {
+        /* fall back to /releases/latest */
       }
-      const payload = await response.json();
-      const normalized = releaseApi.normalizeTag(payload.tag_name);
-      if (normalized) {
-        state.release = normalized;
+    }
+
+    if (!stablePayload && state.releaseApiUrl) {
+      try {
+        const response = await fetch(state.releaseApiUrl, {
+          headers: { Accept: "application/vnd.github+json" },
+        });
+        if (response.ok) {
+          stablePayload = await response.json();
+        }
+      } catch (_error) {
+        /* keep offline fallback */
       }
-      const preferred = currentPlatformAssetName();
-      const assetUrl =
-        releaseApi.findAssetUrl(payload.assets, preferred) ||
-        releaseApi.findAssetUrl(payload.assets, state.windowsAssetName);
-      if (assetUrl) {
-        state.releaseDownloadUrl = assetUrl;
+    }
+
+    if (stablePayload) {
+      const info = releaseApi.resolveDownloadInfo(
+        stablePayload,
+        state,
+        navigator.userAgent,
+        navigator.platform,
+        state.repoUrl
+      );
+      if (info.version) {
+        state.stableVersion = info.version;
+        state.release = info.version;
       }
-    } catch (_error) {
-      /* fall back to version.json and releases/latest */
+      state.releaseDownloadAvailable = info.available;
+      state.releaseDownloadUrl = info.url;
+    }
+
+    if (prereleasePayload) {
+      const preInfo = releaseApi.resolveDownloadInfo(
+        prereleasePayload,
+        state,
+        navigator.userAgent,
+        navigator.platform,
+        state.repoUrl
+      );
+      if (preInfo.version) {
+        state.prereleaseVersion = preInfo.version;
+        state.prereleaseDownloadUrl = preInfo.available ? preInfo.url : preInfo.releasePageUrl;
+      }
     }
   }
 
@@ -392,6 +476,9 @@
           repoUrl: state.repoUrl,
           licenseUrl: state.licenseUrl,
           releaseApiUrl: state.releaseApiUrl,
+          releasesListApiUrl: state.releasesListApiUrl,
+          fallbackPrereleaseTag: state.fallbackPrereleaseTag,
+          fallbackPrereleaseVersion: state.fallbackPrereleaseVersion,
           windowsAssetName: state.windowsAssetName,
           macosArm64AssetName: state.macosArm64AssetName,
           linuxDebAssetName: state.linuxDebAssetName,
@@ -402,6 +489,9 @@
       state.repoUrl = site.repoUrl || state.repoUrl;
       state.licenseUrl = site.licenseUrl || state.licenseUrl;
       state.releaseApiUrl = site.releaseApiUrl || state.releaseApiUrl;
+      state.releasesListApiUrl = site.releasesListApiUrl || state.releasesListApiUrl;
+      state.fallbackPrereleaseTag = site.fallbackPrereleaseTag || state.fallbackPrereleaseTag;
+      state.fallbackPrereleaseVersion = site.fallbackPrereleaseVersion || state.fallbackPrereleaseVersion;
       state.windowsAssetName = site.windowsAssetName || state.windowsAssetName;
       state.macosArm64AssetName = site.macosArm64AssetName || state.macosArm64AssetName;
       state.linuxDebAssetName = site.linuxDebAssetName || state.linuxDebAssetName;

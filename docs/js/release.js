@@ -5,7 +5,27 @@
     if (typeof tag !== "string") {
       return "";
     }
-    return tag.replace(/^v/i, "");
+    return tag.replace(/^(?:pre-release-)?v/i, "");
+  }
+
+  function versionTuple(version) {
+    const normalized = normalizeTag(String(version || ""));
+    const match = normalized.match(/^(\d+)(?:\.(\d+))?(?:\.(\d+))?/);
+    if (!match) {
+      return [0, 0, 0];
+    }
+    return [Number(match[1] || 0), Number(match[2] || 0), Number(match[3] || 0)];
+  }
+
+  function compareVersions(a, b) {
+    const va = versionTuple(a);
+    const vb = versionTuple(b);
+    for (let i = 0; i < 3; i += 1) {
+      if (va[i] !== vb[i]) {
+        return va[i] > vb[i] ? 1 : -1;
+      }
+    }
+    return 0;
   }
 
   function findAssetUrl(assets, assetName) {
@@ -28,6 +48,16 @@
     return "windows";
   }
 
+  function platformDisplayName(detected) {
+    if (detected === "macos") {
+      return "macOS";
+    }
+    if (detected === "linux") {
+      return "Linux";
+    }
+    return "Windows";
+  }
+
   function preferredAssetName(assetConfig, userAgent, platform) {
     const config = assetConfig || {};
     const detected = detectPlatform(userAgent, platform);
@@ -40,11 +70,63 @@
     return config.windowsAssetName || "ParqScan-Windows-Setup.exe";
   }
 
+  function selectReleases(releases) {
+    if (!Array.isArray(releases)) {
+      return { stable: null, prerelease: null };
+    }
+    const published = releases.filter((item) => item && !item.draft && typeof item.tag_name === "string");
+    let stable = null;
+    let newestPrerelease = null;
+
+    for (const item of published) {
+      if (item.prerelease) {
+        if (!newestPrerelease || compareVersions(item.tag_name, newestPrerelease.tag_name) > 0) {
+          newestPrerelease = item;
+        }
+      } else if (!stable || compareVersions(item.tag_name, stable.tag_name) > 0) {
+        stable = item;
+      }
+    }
+
+    const prerelease =
+      newestPrerelease && (!stable || compareVersions(newestPrerelease.tag_name, stable.tag_name) > 0)
+        ? newestPrerelease
+        : null;
+
+    return { stable, prerelease };
+  }
+
+  function resolveDownloadInfo(releasePayload, assetConfig, userAgent, platform, repoUrl) {
+    const detected = detectPlatform(userAgent, platform);
+    const assetName = preferredAssetName(assetConfig, userAgent, platform);
+    const releasePage =
+      (releasePayload && typeof releasePayload.html_url === "string" && releasePayload.html_url) ||
+      releasesPageUrl(repoUrl);
+    const assetUrl = releasePayload ? findAssetUrl(releasePayload.assets, assetName) : "";
+
+    return {
+      platform: detected,
+      platformName: platformDisplayName(detected),
+      assetName,
+      available: Boolean(assetUrl),
+      url: assetUrl || releasePage,
+      releasePageUrl: releasePage,
+      version: releasePayload ? normalizeTag(releasePayload.tag_name) : "",
+    };
+  }
+
   function releasesPageUrl(repoUrl) {
     if (typeof repoUrl !== "string" || !repoUrl) {
       return "";
     }
     return `${repoUrl.replace(/\/$/, "")}/releases/latest`;
+  }
+
+  function allReleasesPageUrl(repoUrl) {
+    if (typeof repoUrl !== "string" || !repoUrl) {
+      return "";
+    }
+    return `${repoUrl.replace(/\/$/, "")}/releases`;
   }
 
   function latestDownloadUrl(repoUrl, assetName) {
@@ -57,10 +139,15 @@
 
   window.ParqScanRelease = {
     normalizeTag,
+    compareVersions,
     findAssetUrl,
     detectPlatform,
+    platformDisplayName,
     preferredAssetName,
+    selectReleases,
+    resolveDownloadInfo,
     releasesPageUrl,
+    allReleasesPageUrl,
     latestDownloadUrl,
   };
 })();

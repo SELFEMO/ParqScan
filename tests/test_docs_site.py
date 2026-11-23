@@ -103,10 +103,20 @@ class DocsSiteTests(unittest.TestCase):
         self.assertTrue(site.get("repoUrl", "").startswith("https://github.com/"))
         self.assertTrue(site.get("licenseUrl", "").startswith("https://www.apache.org/licenses/"))
         self.assertIn("/releases/latest", site.get("releaseApiUrl", ""))
+        self.assertIn("/releases", site.get("releasesListApiUrl", ""))
+        self.assertEqual(site.get("fallbackPrereleaseTag"), "pre-release-v0.3.6")
         self.assertEqual(site.get("windowsAssetName"), "ParqScan-Windows-Setup.exe")
         self.assertEqual(site.get("macosArm64AssetName"), "ParqScan-macOS-arm64.dmg")
         self.assertEqual(site.get("linuxDebAssetName"), "ParqScan-Linux-amd64.deb")
         self.assertEqual(site.get("linuxRpmAssetName"), "ParqScan-Linux-x86_64.rpm")
+
+    def test_index_has_prerelease_and_missing_package_notice_hooks(self) -> None:
+        index = (DOCS / "index.html").read_text(encoding="utf-8")
+        self.assertIn("data-prerelease-download", index)
+        self.assertIn('id="release-status"', index)
+        release_js = (DOCS / "js" / "release.js").read_text(encoding="utf-8")
+        self.assertIn("selectReleases", release_js)
+        self.assertIn("resolveDownloadInfo", release_js)
 
     def test_index_has_release_download_button(self) -> None:
         index = (DOCS / "index.html").read_text(encoding="utf-8")

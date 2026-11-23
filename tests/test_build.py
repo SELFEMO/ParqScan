@@ -147,7 +147,7 @@ class BuildConfigurationTests(unittest.TestCase):
         self.assertIn("dist\\ParqScan", source)
 
     def test_read_release_version(self) -> None:
-        self.assertEqual(build.read_release_version(), "0.3.6")
+        self.assertEqual(build.read_release_version(), "0.3.8")
 
     def test_conda_python_fails_in_strict_mode(self) -> None:
         with patch.object(build, "is_conda_python", return_value=True):

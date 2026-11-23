@@ -24,7 +24,12 @@
   "hero": {
     "title": "每次只读一页 Parquet",
     "lead": "ParqScan 不把整份大文件物化进内存。数据预览采用固定分页，模型只保留当前页；翻页时才从磁盘读取下一窗口。",
-    "ctaDownload": "下载 Windows",
+    "ctaDownload": "下载安装包",
+    "ctaDownloadPlatform": "下载 {platform}",
+    "ctaReleases": "查看 Releases",
+    "ctaPrerelease": "{version} 预览版",
+    "noPackageNotice": "当前发布暂未附带 {platform} 安装包，请前往 Releases 页面查看或从源码运行。",
+    "prereleaseNotice": "当前默认下载为 {stable}；如需测试最新 {preview} 预览版，请点击上方「{preview} 预览版」。",
     "ctaGuide": "使用说明",
     "ctaSource": "查看源码",
     "demoLabel": "交互示意（非真实文件）",

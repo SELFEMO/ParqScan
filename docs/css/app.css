@@ -367,6 +367,24 @@ main {
   gap: var(--space-3);
 }
 
+.btn--preview {
+  border-color: var(--accent-border);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.btn--preview:hover {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent-soft) 80%, var(--accent) 20%);
+}
+
+.hero__copy p.hero__release-note {
+  margin: var(--space-3) 0 0;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
 .demo-panel {
   background: var(--surface);
   border: 1px solid var(--border);

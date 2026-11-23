@@ -1,4 +1,3 @@
-// Keep in sync with docs/i18n/zh.json and docs/i18n/en.json
 window.ParqScanI18n = {
   "zh": {
     "meta": {
@@ -26,7 +25,12 @@ window.ParqScanI18n = {
     "hero": {
       "title": "每次只读一页 Parquet",
       "lead": "ParqScan 不把整份大文件物化进内存。数据预览采用固定分页，模型只保留当前页；翻页时才从磁盘读取下一窗口。",
-      "ctaDownload": "下载 Windows",
+      "ctaDownload": "下载安装包",
+      "ctaDownloadPlatform": "下载 {platform}",
+      "ctaReleases": "查看 Releases",
+      "ctaPrerelease": "{version} 预览版",
+      "noPackageNotice": "当前发布暂未附带 {platform} 安装包，请前往 Releases 页面查看或从源码运行。",
+      "prereleaseNotice": "当前默认下载为 {stable}；如需测试最新 {preview} 预览版，请点击上方「{preview} 预览版」。",
       "ctaGuide": "使用说明",
       "ctaSource": "查看源码",
       "demoLabel": "交互示意（非真实文件）",
@@ -257,7 +261,12 @@ window.ParqScanI18n = {
     "hero": {
       "title": "One Parquet page at a time",
       "lead": "ParqScan never materializes a whole large file into memory. The data view uses fixed paging—the table model keeps only the current page and reads the next window from disk when you turn the page.",
-      "ctaDownload": "Download for Windows",
+      "ctaDownload": "Download",
+      "ctaDownloadPlatform": "Download for {platform}",
+      "ctaReleases": "View Releases",
+      "ctaPrerelease": "{version} Preview",
+      "noPackageNotice": "No {platform} installer is attached to the current release yet. View Releases or run from source.",
+      "prereleaseNotice": "Default download is {stable}; click \"{preview} Preview\" above to test the latest preview build.",
       "ctaGuide": "User guide",
       "ctaSource": "View source",
       "demoLabel": "Interactive demo (not a real file)",

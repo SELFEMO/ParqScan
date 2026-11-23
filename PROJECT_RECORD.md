@@ -2,6 +2,21 @@
 
 按日期记录重要修改及原因。同一天内相关改动已合并，更早条目保持原顺序。
 
+## 2026-11-23 — v0.3.8：官网跨平台缺包兜底、预览版入口分离与 Retina 图标修复
+
+### 修改内容
+
+- 版本号升至 **0.3.8**，并同步更新 `docs/version.json`、`docs/index.html`、`docs/guide.html`、`README.md` 与 `PRODUCT.md`。
+- **修复 Retina 2x 图标裁剪**：移除 `parqscan/utils/icons.py` 中与 `QPixmap.setDevicePixelRatio(scale)` 叠加的冗余 `painter.scale(scale, scale)`，解决 macOS Retina 屏下按钮图标仅显示左上角 1/4 的问题；补充 `tests/test_ui_assets.py` 静态回归断言。
+- **修复 GitHub Latest / Pre-release 历史分流问题**：
+  - `README.md` 顶部版本 badge 增加 `?include_prereleases` 并链接至全部 Releases；保留默认稳定版下载入口，同时新增明确标注的「0.3.6 预览版」（`pre-release-v0.3.6`）与 macOS/Linux 发布说明。
+  - 官网 `docs/js/release.js` 与 `docs/js/site.js` 改为拉取 `/releases` 列表区分稳定版与更新的预览版，在 Hero 区按需展示独立预览版入口。
+- **官网跨平台适配与缺包提示**：当检测到访问者为 macOS/Linux 或当前发布未附带对应平台安装包时，主下载按钮自动降级为前往 Releases 页面并显示明确提示文案，避免跳转到无效的 404 直链。
+
+### 设计原因
+
+GitHub `/releases/latest` 会跳过所有 `prerelease: true` 的预览版本，导致 README 与官网在 0.3.6 预览版发布后仍将下载与版本徽章指向 0.3.3；同时 macOS/Linux 尚未发布历史资产前需要优雅提示，避免用户点击后遭遇 404。
+
 ## 2026-11-23 — macOS Apple Silicon (`.dmg`) 与 Linux (`.deb` / `.rpm`) 跨平台适配
 
 ### 修改内容
