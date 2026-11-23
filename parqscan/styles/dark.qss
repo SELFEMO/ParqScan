@@ -380,9 +380,18 @@ QListWidget#FileList::item:selected {
     font-weight: 600;
 }
 
+QListWidget#FieldList {
+    padding: 4px;
+}
+
+QListWidget#FieldList:focus {
+    padding: 3px;
+}
+
 QListWidget#FieldList::item {
     border-radius: 8px;
-    margin: 2px 0;
+    padding: 7px 10px;
+    margin: 2px 4px;
 }
 
 QHeaderView::section {
@@ -911,11 +920,13 @@ QComboBox#FileSortCombo {
 }
 
 QListWidget#FieldList::item:selected {
+    font-weight: 600;
     background: #244A70;
     color: #DCEEFF;
 }
 
 QListWidget#FieldList::item:selected:!active {
+    font-weight: 600;
     background: #203B59;
     color: #DCEEFF;
 }
