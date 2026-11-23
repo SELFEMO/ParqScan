@@ -542,7 +542,6 @@ QLabel#CompactTooltip {
 QFrame#PaginationBar {
     background: #151A23;
     border: 1px solid #2A3342;
-    border-top: none;
     border-radius: 10px;
 }
 
@@ -604,6 +603,7 @@ QPlainTextEdit#CodeEditor {
 
 QTableView#SchemaTable, QTreeWidget#RowGroupTree {
     border-radius: 11px;
+    padding: 4px;
 }
 
 /* Unified dense-surface and search controls */ QMenu {
@@ -879,6 +879,8 @@ QFrame#DetailPreviewTile {
 QFrame#DetailDockTitle {
     min-height: 30px;
     max-height: 30px;
+    border-top-left-radius: 9px;
+    border-top-right-radius: 9px;
     background: #1E2A3A;
     border-bottom: 1px solid #7A8EA8;
 }
@@ -931,7 +933,7 @@ QPushButton:focus, QToolButton:focus, QTabBar::tab:focus {
     border: 2px solid #47A3FF;
 }
 
-QListWidget:focus, QTableView:focus, QTableWidget:focus, QTreeWidget:focus {
+QListWidget:focus {
     border: 1px solid #47A3FF;
 }
 

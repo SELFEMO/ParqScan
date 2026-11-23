@@ -271,10 +271,12 @@ class PreviewTile(QFrame):
         # English: QSS borders are stroked as rectangles, so a rounded mask leaves a square gray frame; the outline is painted on the rounded path instead.
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        inset = DETAIL_TILE_BORDER_WIDTH / 2
+        theme = "dark" if self.palette().color(self.backgroundRole()).lightness() < 128 else "light"
+        border_color = QColor(get_theme_tokens(theme).border)
+        inset = 0.5
         rect = QRectF(self.rect()).adjusted(inset, inset, -inset, -inset)
         radius = max(0.0, DETAIL_TILE_CORNER_RADIUS - inset)
-        painter.setPen(QPen(self.palette().color(QPalette.ColorRole.WindowText), DETAIL_TILE_BORDER_WIDTH))
+        painter.setPen(QPen(border_color, 1.0))
         painter.setBrush(Qt.BrushStyle.NoBrush)
         painter.drawRoundedRect(rect, radius, radius)
 
@@ -771,7 +773,12 @@ class FieldPreviewPane(CardFrame):
 
     def retranslate(self) -> None:
         self.row_chip.setText(self.translator.tr("detail.row_chip", row=self._source_row + 1))
+        self.view_preview_button.setText(self.translator.tr("detail.view_preview"))
+        self.view_hex_button.setText(self.translator.tr("detail.view_hex"))
+        self.view_json_button.setText(self.translator.tr("detail.view_json"))
         self.wrap_button.setText(self.translator.tr("detail.wrap_text"))
+        if self.stack.currentWidget() is self.hex_preview:
+            self.hex_preview.set_label(f"{self._field_name} · {self.translator.tr('detail.source_row', row=self._source_row + 1)}")
         self.zoom_out_button.setText(self.translator.tr("detail.zoom_out"))
         self.zoom_in_button.setText(self.translator.tr("detail.zoom_in"))
         self.reset_view_button.setText(self.translator.tr("detail.reset_view"))

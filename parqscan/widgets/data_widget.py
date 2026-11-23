@@ -194,7 +194,7 @@ class DataWidget(QWidget):
         self.table_card = CardFrame(object_name="TableCard")
         table_layout = QVBoxLayout(self.table_card)
         table_layout.setContentsMargins(0, 0, 0, 0)
-        table_layout.setSpacing(0)
+        table_layout.setSpacing(10)
 
         self.empty_banner = QWidget()
         empty_banner_layout = QHBoxLayout(self.empty_banner)
