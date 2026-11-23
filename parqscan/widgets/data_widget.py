@@ -258,7 +258,7 @@ class DataWidget(QWidget):
         root = QVBoxLayout(self)
         root.setContentsMargins(24, 20, 24, 24)
         root.setSpacing(12)
-        root.addLayout(heading_layout)
+        root.addLayout(heading_row)
         root.addWidget(search_card)
         root.addWidget(filter_card)
         root.addWidget(self.table_card, 1)
