@@ -124,8 +124,9 @@ def make_icon(name: str, color: str = "#475569", size: int = 20, disabled_color:
         pixmap = QPixmap(size * scale, size * scale)
         pixmap.setDevicePixelRatio(scale)
         pixmap.fill(Qt.GlobalColor.transparent)
+        # QPixmap.setDevicePixelRatio(scale) 已自动将 QPainter 逻辑坐标系映射为 0..size，不可再叠加缩放，否则 2x 图标会被裁切。
+        # QPixmap.setDevicePixelRatio(scale) already maps QPainter's logical coordinates to 0..size; adding extra scaling would double-scale and crop 2x icons.
         painter = QPainter(pixmap)
-        painter.scale(scale, scale)
         _paint_icon(painter, name, color, size)
         painter.end()
         icon.addPixmap(pixmap, QIcon.Mode.Normal)
@@ -135,7 +136,6 @@ def make_icon(name: str, color: str = "#475569", size: int = 20, disabled_color:
         disabled_pixmap.setDevicePixelRatio(scale)
         disabled_pixmap.fill(Qt.GlobalColor.transparent)
         disabled_painter = QPainter(disabled_pixmap)
-        disabled_painter.scale(scale, scale)
         _paint_icon(disabled_painter, name, disabled_hex, size)
         disabled_painter.end()
         icon.addPixmap(disabled_pixmap, QIcon.Mode.Disabled)

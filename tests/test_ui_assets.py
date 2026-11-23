@@ -50,6 +50,8 @@ class UiAssetTests(unittest.TestCase):
         self.assertIn('tip = QPointF(center + horizontal, size / 2)', source)
         self.assertIn('elif name == "right":', source)
         self.assertIn('_draw_chevron(painter, "right", size)', source)
+        self.assertNotIn("painter.scale(scale, scale)", source)
+        self.assertNotIn("disabled_painter.scale(scale, scale)", source)
 
     def test_page_load_resets_table_scroll_position(self) -> None:
         source = (ROOT / "parqscan" / "widgets" / "data_widget.py").read_text(encoding="utf-8")
